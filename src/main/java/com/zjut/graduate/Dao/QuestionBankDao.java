@@ -19,6 +19,10 @@ public interface QuestionBankDao {
     })
     QuestionBank selectById(Long id);
 
+    @Select("SELECT * FROM question_bank ORDER BY created_at DESC")
+    @ResultMap("questionResult")
+    List<QuestionBank> selectAll();
+
     /**
      * 根据知识点ID列表筛选题目（任意一个知识点匹配即可）
      * 逗号分隔的知识点ID字符串，如 "1,3"

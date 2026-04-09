@@ -12,3 +12,12 @@ mybatis:
     map-underscore-to-camel-case: true    # 下划线转驼峰自动映射
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 打印SQL
   type-aliases-package: com.zjut.graduate.Po
+
+spring-ai:
+  provider: openai-compatible
+  openai:
+    base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.deepseek.com}
+    api-key: ${SPRING_AI_OPENAI_API_KEY:}
+    chat:
+      options:
+        model: ${SPRING_AI_OPENAI_MODEL:deepseek-chat}

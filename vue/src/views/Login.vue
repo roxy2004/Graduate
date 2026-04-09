@@ -41,7 +41,12 @@ const handleLogin = async () => {
       if (response.user) {
         localStorage.setItem("user", JSON.stringify(response.user));
       }
-      await router.push("/manager/home");
+      const role = response?.user?.role;
+      if (role === "teacher") {
+        await router.push("/manager/teacher/users");
+      } else {
+        await router.push("/manager/home");
+      }
     } else {
       ElMessage.error(response?.message || "登录失败");
     }

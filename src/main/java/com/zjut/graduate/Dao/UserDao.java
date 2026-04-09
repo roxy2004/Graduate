@@ -2,6 +2,9 @@ package com.zjut.graduate.Dao;
 
 import com.zjut.graduate.Po.User;
 import org.apache.ibatis.annotations.*;
+
+import java.util.List;
+
 @Mapper
 public interface UserDao {
     @Select("SELECT * FROM user WHERE id = #{id}")
@@ -18,9 +21,19 @@ public interface UserDao {
     @ResultMap("userResult")
     User selectByUsername(String username);
 
+    @Select("SELECT * FROM user WHERE role = #{role} ORDER BY created_at DESC")
+    @ResultMap("userResult")
+    List<User> selectByRole(String role);
+
+    @Select("SELECT COUNT(1) FROM user WHERE username = #{username}")
+    int countByUsername(String username);
+
     @Insert("INSERT INTO user (username, password, role, created_at) VALUES (#{username}, #{password}, #{role}, #{createdAt})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(User user);
+
+    @Update("UPDATE user SET password = #{password} WHERE id = #{id}")
+    int updatePasswordById(@Param("id") Long id, @Param("password") String password);
 
     @Update("UPDATE user SET username = #{username}, password = #{password}, role = #{role}, created_at = #{createdAt} WHERE id = #{id}")
     int update(User user);
