@@ -1,0 +1,14 @@
+spring:
+  application:
+    name:Graduate
+  datasource:
+    url: jdbc:mysql://localhost:3306/graduate
+    username: root
+    password: MySQL@123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true    # 下划线转驼峰自动映射
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 打印SQL
+  type-aliases-package: com.zjut.graduate.Po
