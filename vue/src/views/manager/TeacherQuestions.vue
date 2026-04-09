@@ -1,9 +1,12 @@
 <template>
   <div class="teacher-questions">
-    <el-card>
+    <el-card class="page-shell">
       <template #header>
         <div class="card-header">
-          <span>题目管理</span>
+          <div>
+            <h3 class="page-title">题目管理</h3>
+            <p class="page-desc">批量导入、查看和删除题目</p>
+          </div>
           <el-button type="primary" @click="fetchQuestions">刷新</el-button>
         </div>
       </template>
@@ -99,7 +102,7 @@ onMounted(() => {
 
 <style scoped>
 .teacher-questions {
-  background: #fff;
+  background: transparent;
 }
 
 .card-header {

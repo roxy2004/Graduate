@@ -7,11 +7,15 @@ const router = createRouter({
     {
       path:'/manager',
       component:()=>import('@/views/Manager.vue'),
-      redirect:'/manager/home',
+      redirect:'/manager/student/dashboard',
       children:[
-        {path:'home',component:()=>import('@/views/manager/Home.vue')},
         {path:'teacher/users',component:()=>import('@/views/manager/TeacherUsers.vue')},
         {path:'teacher/questions',component:()=>import('@/views/manager/TeacherQuestions.vue')},
+        {path:'student/dashboard',component:()=>import('@/views/manager/student/Dashboard.vue')},
+        {path:'student/practice',component:()=>import('@/views/manager/student/Practice.vue')},
+        {path:'student/mistakes',component:()=>import('@/views/manager/student/Mistakes.vue')},
+        {path:'student/profile',component:()=>import('@/views/manager/student/Profile.vue')},
+        {path:'student/account',component:()=>import('@/views/manager/student/Account.vue')},
       ]
     },
     {path:'/login',component:()=>import('@/views/Login.vue')},
@@ -29,7 +33,11 @@ router.beforeEach((to, from, next) => {
     return
   }
   if (to.path.startsWith('/manager/teacher') && user.role !== 'teacher') {
-    next('/manager/home')
+    next('/manager/student/dashboard')
+    return
+  }
+  if (to.path.startsWith('/manager/student') && user.role !== 'student') {
+    next('/manager/teacher/users')
     return
   }
   next()

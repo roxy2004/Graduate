@@ -1,9 +1,12 @@
 <template>
   <div class="teacher-users">
-    <el-card>
+    <el-card class="page-shell">
       <template #header>
         <div class="card-header">
-          <span>学生账号管理</span>
+          <div>
+            <h3 class="page-title">学生管理</h3>
+            <p class="page-desc">创建、重置和删除学生账号</p>
+          </div>
           <el-button type="primary" @click="fetchStudents">刷新</el-button>
         </div>
       </template>
@@ -131,7 +134,7 @@ onMounted(() => {
 
 <style scoped>
 .teacher-users {
-  background: #fff;
+  background: transparent;
 }
 
 .card-header {

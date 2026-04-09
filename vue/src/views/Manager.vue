@@ -1,11 +1,15 @@
 <template>
   <div class="manager-layout">
-    <div class="manager-header">
+    <div class="manager-header page-shell">
       <div class="header-left">
-        <span class="title">学习系统</span>
-        <el-button text @click="goHome">首页</el-button>
+        <span class="title">&gt;_ Learning System</span>
         <el-button v-if="user?.role === 'teacher'" text @click="goTeacherUsers">学生管理</el-button>
         <el-button v-if="user?.role === 'teacher'" text @click="goTeacherQuestions">题目管理</el-button>
+        <el-button v-if="user?.role === 'student'" text @click="goStudentDashboard">学生首页</el-button>
+        <el-button v-if="user?.role === 'student'" text @click="goStudentPractice">练习中心</el-button>
+        <el-button v-if="user?.role === 'student'" text @click="goStudentMistakes">错题本</el-button>
+        <el-button v-if="user?.role === 'student'" text @click="goStudentProfile">学习画像</el-button>
+        <el-button v-if="user?.role === 'student'" text @click="goStudentAccount">个人中心</el-button>
       </div>
       <div class="header-right">
         <span class="user-name">{{ user?.username }} ({{ user?.role }})</span>
@@ -26,16 +30,32 @@ import request from "@/utils/request";
 const router = useRouter();
 const user = computed(() => JSON.parse(localStorage.getItem("user") || "null"));
 
-const goHome = async () => {
-  await router.push("/manager/home");
-};
-
 const goTeacherUsers = async () => {
   await router.push("/manager/teacher/users");
 };
 
 const goTeacherQuestions = async () => {
   await router.push("/manager/teacher/questions");
+};
+
+const goStudentDashboard = async () => {
+  await router.push("/manager/student/dashboard");
+};
+
+const goStudentPractice = async () => {
+  await router.push("/manager/student/practice");
+};
+
+const goStudentMistakes = async () => {
+  await router.push("/manager/student/mistakes");
+};
+
+const goStudentProfile = async () => {
+  await router.push("/manager/student/profile");
+};
+
+const goStudentAccount = async () => {
+  await router.push("/manager/student/account");
 };
 
 const logout = async () => {
@@ -51,17 +71,18 @@ const logout = async () => {
 <style scoped>
 .manager-layout {
   min-height: 100vh;
-  background: #f5f7fa;
+  padding: 14px;
 }
 
 .manager-header {
-  height: 56px;
+  min-height: 62px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  background: #409eff;
-  color: #fff;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #1e293b;
 }
 
 .header-left,
@@ -72,16 +93,18 @@ const logout = async () => {
 }
 
 .title {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 600;
   margin-right: 8px;
+  color: #2563eb;
 }
 
 .user-name {
   font-size: 14px;
+  color: #64748b;
 }
 
 .manager-content {
-  padding: 20px;
+  padding: 0;
 }
 </style>

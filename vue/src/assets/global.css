@@ -1,6 +1,121 @@
-body{
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-primary: #f4fbf7;
+    --bg-secondary: #eef7ff;
+    --panel-bg: #ffffff;
+    --panel-border: #d8e1f0;
+    --text-main: #1c2636;
+    --text-muted: #6d7890;
+    --accent: #3b82f6;
+}
+
+body {
     margin: 0;
     padding: 0;
     font-size: 14px;
-    color: #333;
+    color: var(--text-main);
+    background: linear-gradient(160deg, #f4fbf7 0%, #edf7ff 45%, #f7fbff 100%);
+    font-family: "JetBrains Mono", "Cascadia Code", "Consolas", "Microsoft YaHei", monospace;
+    overflow-x: hidden;
+    position: relative;
+}
+
+#app {
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+.page-shell {
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(11, 18, 32, 0.08);
+}
+
+.page-title {
+    margin: 0;
+    font-size: 22px;
+    letter-spacing: 0.5px;
+}
+
+.page-desc {
+    margin: 8px 0 0 0;
+    color: var(--text-muted);
+}
+
+body::before,
+body::after {
+    content: "";
+    position: fixed;
+    width: 42vw;
+    height: 42vw;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(70px);
+    z-index: 0;
+    opacity: 0.22;
+}
+
+body::before {
+    top: -18vw;
+    left: -12vw;
+    background: #8dd3c7;
+    animation: floatBlobA 16s ease-in-out infinite;
+}
+
+body::after {
+    right: -16vw;
+    bottom: -16vw;
+    background: #b3e5fc;
+    animation: floatBlobB 20s ease-in-out infinite;
+}
+
+.el-button {
+    transition: transform 0.22s ease, box-shadow 0.22s ease, filter 0.22s ease, background-color 0.22s ease;
+}
+
+.el-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+    filter: saturate(1.06);
+}
+
+.el-button:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.el-button--text {
+    border-radius: 8px;
+    padding: 6px 10px;
+}
+
+.el-button--text:hover {
+    background: rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.18) inset;
+}
+
+.el-tag {
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.el-tag:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(30, 41, 59, 0.2);
+    filter: brightness(1.03);
+}
+
+@keyframes floatBlobA {
+    0% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(2vw, 3vh, 0) scale(1.08); }
+    100% { transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes floatBlobB {
+    0% { transform: translate3d(0, 0, 0) scale(1); }
+    50% { transform: translate3d(-2vw, -3vh, 0) scale(1.1); }
+    100% { transform: translate3d(0, 0, 0) scale(1); }
 }

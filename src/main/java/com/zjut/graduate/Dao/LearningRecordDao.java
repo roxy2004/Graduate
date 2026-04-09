@@ -30,4 +30,13 @@ public interface LearningRecordDao {
             "VALUES (#{userId}, #{questionId}, #{userAnswer}, #{isCorrect}, #{timeSpent}, #{createdAt})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(LearningRecord record);
+
+    @Select("SELECT COUNT(1) FROM learning_record WHERE user_id = #{userId}")
+    int countByUserId(@Param("userId") Long userId);
+
+    @Select("SELECT COUNT(1) FROM learning_record WHERE user_id = #{userId} AND is_correct = 1")
+    int countCorrectByUserId(@Param("userId") Long userId);
+
+    @Select("SELECT COUNT(DISTINCT DATE(created_at)) FROM learning_record WHERE user_id = #{userId}")
+    int countLearningDaysByUserId(@Param("userId") Long userId);
 }
