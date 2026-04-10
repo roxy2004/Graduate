@@ -11,7 +11,7 @@ public interface UserDao {
     @Results(id = "userResult", value = {
             @Result(column = "id", property = "id"),
             @Result(column = "username", property = "username"),
-            @Result(column = "password", property = "password"),
+            @Result(column = "password_hash", property = "password"),
             @Result(column = "role", property = "role"),
             @Result(column = "created_at", property = "createdAt")
     })
@@ -28,14 +28,16 @@ public interface UserDao {
     @Select("SELECT COUNT(1) FROM user WHERE username = #{username}")
     int countByUsername(String username);
 
-    @Insert("INSERT INTO user (username, password, role, created_at) VALUES (#{username}, #{password}, #{role}, #{createdAt})")
+    @Insert("INSERT INTO user (username, password_hash, role, status, created_at, updated_at) " +
+            "VALUES (#{username}, #{password}, #{role}, 1, #{createdAt}, #{createdAt})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(User user);
 
-    @Update("UPDATE user SET password = #{password} WHERE id = #{id}")
+    @Update("UPDATE user SET password_hash = #{password}, updated_at = NOW() WHERE id = #{id}")
     int updatePasswordById(@Param("id") Long id, @Param("password") String password);
 
-    @Update("UPDATE user SET username = #{username}, password = #{password}, role = #{role}, created_at = #{createdAt} WHERE id = #{id}")
+    @Update("UPDATE user SET username = #{username}, password_hash = #{password}, role = #{role}, " +
+            "created_at = #{createdAt}, updated_at = NOW() WHERE id = #{id}")
     int update(User user);
 
     @Delete("DELETE FROM user WHERE id = #{id}")

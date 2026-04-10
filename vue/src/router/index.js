@@ -12,6 +12,7 @@ const router = createRouter({
         {path:'teacher/users',component:()=>import('@/views/manager/TeacherUsers.vue')},
         {path:'teacher/questions',component:()=>import('@/views/manager/TeacherQuestions.vue')},
         {path:'student/dashboard',component:()=>import('@/views/manager/student/Dashboard.vue')},
+        {path:'student/learning',component:()=>import('@/views/manager/student/Learning.vue')},
         {path:'student/practice',component:()=>import('@/views/manager/student/Practice.vue')},
         {path:'student/mistakes',component:()=>import('@/views/manager/student/Mistakes.vue')},
         {path:'student/profile',component:()=>import('@/views/manager/student/Profile.vue')},

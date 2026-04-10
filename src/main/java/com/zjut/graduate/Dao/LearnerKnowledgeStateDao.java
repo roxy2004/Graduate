@@ -18,8 +18,8 @@ public interface LearnerKnowledgeStateDao {
     /**
      * 插入新的掌握度记录
      */
-    @Insert("INSERT INTO learner_knowledge_state (user_id, kp_id, mastery_level, last_practiced_at, updated_at) " +
-            "VALUES (#{userId}, #{kpId}, #{masteryLevel}, #{lastPracticedAt}, #{updatedAt})")
+    @Insert("INSERT INTO learner_knowledge_state (user_id, kp_id, mastery_level, confidence, last_practiced_at, updated_at) " +
+            "VALUES (#{userId}, #{kpId}, #{masteryLevel}, 0.60, #{lastPracticedAt}, #{updatedAt})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(LearnerKnowledgeState state);
 

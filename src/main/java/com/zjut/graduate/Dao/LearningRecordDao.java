@@ -27,8 +27,9 @@ public interface LearningRecordDao {
                                                @Param("startTime") Date startTime,
                                                @Param("endTime") Date endTime);
 
-    @Insert("INSERT INTO learning_record (user_id, question_id, user_answer, is_correct, time_spent, created_at) " +
-            "VALUES (#{userId}, #{questionId}, #{userAnswer}, #{isCorrect}, #{timeSpent}, #{createdAt})")
+    @Insert("INSERT INTO learning_record (user_id, question_id, user_answer, is_correct, score, time_spent, attempt_no, answered_at, created_at) " +
+            "VALUES (#{userId}, #{questionId}, #{userAnswer}, #{isCorrect}, " +
+            "CASE WHEN #{isCorrect} = 1 THEN 5.00 ELSE 0.00 END, #{timeSpent}, 1, #{createdAt}, #{createdAt})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(LearningRecord record);
 
@@ -53,10 +54,11 @@ public interface LearningRecordDao {
     int deleteAllByUserId(@Param("userId") Long userId);
 
     @Select("SELECT lr.id, lr.question_id, qb.content, qb.options, qb.correct_answer, lr.user_answer, lr.is_correct, " +
-            "ma.error_type, ma.knowledge_point, lr.created_at " +
+            "ma.error_type, kp.name AS knowledge_point, lr.created_at " +
             "FROM learning_record lr " +
             "LEFT JOIN question_bank qb ON lr.question_id = qb.id " +
             "LEFT JOIN mistake_analysis ma ON ma.record_id = lr.id " +
+            "LEFT JOIN knowledge_point kp ON kp.id = ma.kp_id " +
             "WHERE lr.user_id = #{userId} AND lr.is_correct = 0 " +
             "ORDER BY lr.created_at DESC")
     List<Map<String, Object>> selectMistakesByUserId(@Param("userId") Long userId);

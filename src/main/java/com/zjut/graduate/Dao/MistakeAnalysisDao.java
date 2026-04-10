@@ -11,12 +11,13 @@ public interface MistakeAnalysisDao {
     @Select("SELECT * FROM mistake_analysis WHERE record_id = #{recordId}")
     MistakeAnalysis selectByRecordId(Long recordId);
 
-    @Insert("INSERT INTO mistake_analysis (record_id, knowledge_point, error_type, suggestion, raw_llm_output, created_at) " +
-            "VALUES (#{recordId}, #{knowledgePoint}, #{errorType}, #{suggestion}, #{rawLlmOutput}, #{createdAt})")
+    @Insert("INSERT INTO mistake_analysis (record_id, user_id, kp_id, error_type, weakness_score, suggestion, raw_llm_output, created_at, updated_at) " +
+            "VALUES (#{recordId}, (SELECT user_id FROM learning_record WHERE id = #{recordId}), NULL, #{errorType}, 0.60, " +
+            "#{suggestion}, #{rawLlmOutput}, #{createdAt}, NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(MistakeAnalysis analysis);
 
-    @Update("UPDATE mistake_analysis SET knowledge_point = #{knowledgePoint}, error_type = #{errorType}, " +
-            "suggestion = #{suggestion}, raw_llm_output = #{rawLlmOutput} WHERE id = #{id}")
+    @Update("UPDATE mistake_analysis SET error_type = #{errorType}, suggestion = #{suggestion}, " +
+            "raw_llm_output = #{rawLlmOutput}, updated_at = NOW() WHERE id = #{id}")
     int update(MistakeAnalysis analysis);
 }

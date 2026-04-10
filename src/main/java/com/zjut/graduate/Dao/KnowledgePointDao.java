@@ -12,7 +12,8 @@ public interface KnowledgePointDao {
     @Select("SELECT * FROM knowledge_point")
     List<KnowledgePoint> selectAll();
 
-    @Insert("INSERT INTO knowledge_point (name) VALUES (#{name})")
+    @Insert("INSERT INTO knowledge_point (name, category, description, difficulty_ref, created_at, updated_at) " +
+            "VALUES (#{name}, '通用', '', 0.50, NOW(), NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(KnowledgePoint kp);
 
