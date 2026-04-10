@@ -95,6 +95,24 @@ const handleLogin = async () => {
   width: 100%;
 }
 
+.login-panel :deep(.el-input__wrapper) {
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(248, 250, 252, 0.9);
+  box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.35) inset;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, background-color 0.18s ease;
+}
+
+.login-panel :deep(.el-input__wrapper:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.35) inset, 0 10px 22px rgba(11, 18, 32, 0.08);
+}
+
+.login-panel :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.28) inset, 0 12px 26px rgba(37, 99, 235, 0.12);
+  background: #fff;
+}
+
 .bg-words {
   position: absolute;
   inset: 0;

@@ -1,6 +1,6 @@
 package com.zjut.graduate.Controller;
 
-import com.zjut.graduate.Dao.LearningRecordDao;
+import com.zjut.graduate.Service.StudentDashboardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,7 +17,7 @@ import java.util.Map;
 public class StudentDashboardController {
 
     @Autowired
-    private LearningRecordDao learningRecordDao;
+    private StudentDashboardService studentDashboardService;
 
     @GetMapping("/dashboard")
     public Map<String, Object> getDashboardStats(HttpSession session) {
@@ -26,16 +26,7 @@ public class StudentDashboardController {
             return authError;
         }
         Long userId = (Long) session.getAttribute("userId");
-        int solvedCount = learningRecordDao.countByUserId(userId);
-        int correctCount = learningRecordDao.countCorrectByUserId(userId);
-        int learningDays = learningRecordDao.countLearningDaysByUserId(userId);
-        double accuracy = solvedCount == 0 ? 0D : (correctCount * 100D / solvedCount);
-
-        Map<String, Object> data = new HashMap<>();
-        data.put("solvedCount", solvedCount);
-        data.put("correctCount", correctCount);
-        data.put("accuracy", Math.round(accuracy * 10D) / 10D);
-        data.put("learningDays", learningDays);
+        Map<String, Object> data = studentDashboardService.getDashboardStats(userId);
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");

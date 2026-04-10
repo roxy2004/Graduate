@@ -1,6 +1,6 @@
 package com.zjut.graduate.Controller;
 
-import com.zjut.graduate.Service.StudentLearningRecordService;
+import com.zjut.graduate.Service.StudentMistakeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,48 +11,36 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
-@RequestMapping("/xwd/student/records")
-public class StudentLearningRecordController {
+@RequestMapping("/xwd/student/mistakes")
+public class StudentMistakeController {
 
     @Autowired
-    private StudentLearningRecordService studentLearningRecordService;
+    private StudentMistakeService studentMistakeService;
 
     @GetMapping
-    public Map<String, Object> listRecords(HttpSession session) {
+    public Map<String, Object> listMistakes(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
         if (authError != null) return authError;
         Long userId = (Long) session.getAttribute("userId");
-        List<Map<String, Object>> records = studentLearningRecordService.listRecords(userId);
+        List<Map<String, Object>> data = studentMistakeService.listMistakes(userId);
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
-        response.put("data", records);
+        response.put("data", data);
         return response;
     }
 
-    @DeleteMapping("/{id}")
-    public Map<String, Object> deleteRecord(@PathVariable("id") Long id, HttpSession session) {
+    @PostMapping("/{recordId}/redo")
+    public Map<String, Object> redo(@PathVariable("recordId") Long recordId,
+                                    @RequestBody Map<String, String> payload,
+                                    HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
         if (authError != null) return authError;
         Long userId = (Long) session.getAttribute("userId");
-        boolean deleted = studentLearningRecordService.deleteRecord(userId, id);
-        if (!deleted) return error("删除失败，记录不存在");
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("message", "删除成功");
-        return response;
-    }
-
-    @DeleteMapping
-    public Map<String, Object> clearAll(HttpSession session) {
-        Map<String, Object> authError = requireStudent(session);
-        if (authError != null) return authError;
-        Long userId = (Long) session.getAttribute("userId");
-        int affected = studentLearningRecordService.clearAll(userId);
-        Map<String, Object> response = new HashMap<>();
-        response.put("status", "success");
-        response.put("message", "已清空");
-        response.put("count", affected);
-        return response;
+        String answer = payload.get("answer");
+        if (answer == null || answer.trim().isEmpty()) {
+            return error("请选择重做答案");
+        }
+        return studentMistakeService.redo(userId, recordId, answer);
     }
 
     private Map<String, Object> requireStudent(HttpSession session) {

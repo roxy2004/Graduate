@@ -9,6 +9,7 @@
         <el-button v-if="user?.role === 'student'" text @click="goStudentPractice">练习中心</el-button>
         <el-button v-if="user?.role === 'student'" text @click="goStudentMistakes">错题本</el-button>
         <el-button v-if="user?.role === 'student'" text @click="goStudentProfile">学习画像</el-button>
+        <el-button v-if="user?.role === 'student'" text @click="goStudentRecommendations">预测推荐</el-button>
         <el-button v-if="user?.role === 'student'" text @click="goStudentAccount">个人中心</el-button>
       </div>
       <div class="header-right">
@@ -52,6 +53,10 @@ const goStudentMistakes = async () => {
 
 const goStudentProfile = async () => {
   await router.push("/manager/student/profile");
+};
+
+const goStudentRecommendations = async () => {
+  await router.push("/manager/student/recommendations");
 };
 
 const goStudentAccount = async () => {

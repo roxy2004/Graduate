@@ -51,4 +51,25 @@ public interface LearningRecordDao {
 
     @Delete("DELETE FROM learning_record WHERE user_id = #{userId}")
     int deleteAllByUserId(@Param("userId") Long userId);
+
+    @Select("SELECT lr.id, lr.question_id, qb.content, qb.options, qb.correct_answer, lr.user_answer, lr.is_correct, " +
+            "ma.error_type, ma.knowledge_point, lr.created_at " +
+            "FROM learning_record lr " +
+            "LEFT JOIN question_bank qb ON lr.question_id = qb.id " +
+            "LEFT JOIN mistake_analysis ma ON ma.record_id = lr.id " +
+            "WHERE lr.user_id = #{userId} AND lr.is_correct = 0 " +
+            "ORDER BY lr.created_at DESC")
+    List<Map<String, Object>> selectMistakesByUserId(@Param("userId") Long userId);
+
+    @Select("SELECT lr.id, lr.user_id, lr.question_id, lr.user_answer, lr.is_correct, qb.correct_answer " +
+            "FROM learning_record lr LEFT JOIN question_bank qb ON lr.question_id = qb.id " +
+            "WHERE lr.id = #{id}")
+    Map<String, Object> selectMistakeDetailById(@Param("id") Long id);
+
+    @Update("UPDATE learning_record SET user_answer = #{userAnswer}, is_correct = #{isCorrect} " +
+            "WHERE id = #{id} AND user_id = #{userId}")
+    int updateRedoResult(@Param("id") Long id,
+                         @Param("userId") Long userId,
+                         @Param("userAnswer") String userAnswer,
+                         @Param("isCorrect") Integer isCorrect);
 }
