@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.*;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 @Mapper
 public interface LearningRecordDao {
     @Select("SELECT * FROM learning_record WHERE id = #{id}")
@@ -39,4 +40,15 @@ public interface LearningRecordDao {
 
     @Select("SELECT COUNT(DISTINCT DATE(created_at)) FROM learning_record WHERE user_id = #{userId}")
     int countLearningDaysByUserId(@Param("userId") Long userId);
+
+    @Select("SELECT lr.id, lr.question_id, qb.content, lr.user_answer, lr.is_correct, lr.time_spent, lr.created_at " +
+            "FROM learning_record lr LEFT JOIN question_bank qb ON lr.question_id = qb.id " +
+            "WHERE lr.user_id = #{userId} ORDER BY lr.created_at DESC")
+    List<Map<String, Object>> selectWithQuestionContentByUserId(@Param("userId") Long userId);
+
+    @Delete("DELETE FROM learning_record WHERE id = #{id} AND user_id = #{userId}")
+    int deleteByIdAndUserId(@Param("id") Long id, @Param("userId") Long userId);
+
+    @Delete("DELETE FROM learning_record WHERE user_id = #{userId}")
+    int deleteAllByUserId(@Param("userId") Long userId);
 }

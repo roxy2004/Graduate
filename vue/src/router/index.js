@@ -16,6 +16,7 @@ const router = createRouter({
         {path:'student/mistakes',component:()=>import('@/views/manager/student/Mistakes.vue')},
         {path:'student/profile',component:()=>import('@/views/manager/student/Profile.vue')},
         {path:'student/account',component:()=>import('@/views/manager/student/Account.vue')},
+        {path:'student/records',component:()=>import('@/views/manager/student/SolvedRecords.vue')},
       ]
     },
     {path:'/login',component:()=>import('@/views/Login.vue')},

@@ -6,10 +6,10 @@
     </div>
 
     <div class="cards-grid">
-      <div class="stat-card card-blue">
+      <div class="stat-card card-blue clickable" @click="router.push('/manager/student/records')">
         <div class="card-title">已做题数</div>
         <div class="card-value">{{ animatedSolvedCount }}</div>
-        <div class="card-sub">累计完成练习题目</div>
+        <div class="card-sub">累计完成练习题目（点击查看记录）</div>
       </div>
 
       <div class="stat-card card-green">
@@ -110,6 +110,14 @@ onMounted(() => {
   padding: 18px;
   color: #fff;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.clickable:active {
+  transform: translateY(-1px) scale(0.99);
 }
 
 .stat-card:hover {
