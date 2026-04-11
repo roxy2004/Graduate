@@ -5,6 +5,7 @@
         <span class="title">&gt;_ Learning System</span>
         <el-button v-if="user?.role === 'teacher'" text @click="goTeacherUsers">学生管理</el-button>
         <el-button v-if="user?.role === 'teacher'" text @click="goTeacherQuestions">题目管理</el-button>
+        <el-button v-if="user?.role === 'teacher'" text @click="goTeacherChapters">章节资料</el-button>
         <el-button v-if="user?.role === 'student'" text @click="goStudentDashboard">学生首页</el-button>
         <el-button v-if="user?.role === 'student'" text @click="goStudentLearning">专项学习</el-button>
         <el-button v-if="user?.role === 'student'" text @click="goStudentPractice">练习中心</el-button>
@@ -38,6 +39,10 @@ const goTeacherUsers = async () => {
 
 const goTeacherQuestions = async () => {
   await router.push("/manager/teacher/questions");
+};
+
+const goTeacherChapters = async () => {
+  await router.push("/manager/teacher/chapters");
 };
 
 const goStudentDashboard = async () => {

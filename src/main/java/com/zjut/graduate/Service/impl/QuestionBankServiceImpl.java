@@ -1,11 +1,15 @@
 package com.zjut.graduate.Service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zjut.graduate.Dao.LearningRecordDao;
+import com.zjut.graduate.Dao.MistakeAnalysisDao;
 import com.zjut.graduate.Dao.QuestionBankDao;
+import com.zjut.graduate.Dao.QuestionKnowledgePointRelDao;
 import com.zjut.graduate.Po.QuestionBank;
 import com.zjut.graduate.Service.QuestionBankService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
@@ -26,8 +30,17 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     @Autowired
     private QuestionBankDao questionBankDao;
 
+    @Autowired
+    private QuestionKnowledgePointRelDao questionKnowledgePointRelDao;
+
+    @Autowired
+    private MistakeAnalysisDao mistakeAnalysisDao;
+
+    @Autowired
+    private LearningRecordDao learningRecordDao;
+
     @Override
-    public int importQuestionsFromCsv(MultipartFile file) {
+    public int importQuestionsFromCsv(MultipartFile file, Long createdByUserId) {
         if (file == null || file.isEmpty()) {
             return 0;
         }
@@ -60,8 +73,14 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 question.setCorrectAnswer(getValue(row, "correct_answer", "correctAnswer").trim().toUpperCase());
                 question.setDifficulty(parseDifficulty(getValue(row, "difficulty")));
                 question.setKnowledgePointIds(getValue(row, "knowledge_point_ids", "knowledgePointIds").trim());
+                question.setQuestionType("choice");
+                String sourceTag = emptyToNull(getValue(row, "source_tag", "sourceTag"));
+                question.setSourceTag(sourceTag != null ? sourceTag : "教师导入");
+                question.setStatus(1);
+                question.setCreatedBy(createdByUserId);
                 question.setCreatedAt(new Date());
                 questionBankDao.insert(question);
+                saveKnowledgePointRelations(question.getId(), question.getKnowledgePointIds());
                 importedCount++;
             }
         } catch (IOException e) {
@@ -76,8 +95,32 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public boolean deleteQuestion(Long questionId) {
+        if (questionId == null) {
+            return false;
+        }
+        mistakeAnalysisDao.deleteByQuestionId(questionId);
+        learningRecordDao.deleteByQuestionId(questionId);
+        questionKnowledgePointRelDao.deleteByQuestionId(questionId);
         return questionBankDao.deleteById(questionId) > 0;
+    }
+
+    private void saveKnowledgePointRelations(Long questionId, String knowledgePointIdsCsv) {
+        if (questionId == null || isBlank(knowledgePointIdsCsv)) {
+            return;
+        }
+        for (String part : knowledgePointIdsCsv.split(",")) {
+            if (isBlank(part)) {
+                continue;
+            }
+            try {
+                long kpId = Long.parseLong(part.trim());
+                questionKnowledgePointRelDao.insert(questionId, kpId);
+            } catch (NumberFormatException ignored) {
+                // 跳过非法知识点 ID
+            }
+        }
     }
 
     private Map<String, String> toRowMap(List<String> headers, List<String> values) {

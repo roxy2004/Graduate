@@ -102,17 +102,26 @@ WHERE lr.user_id = @uid
   AND qb.knowledge_point_ids REGEXP '^[0-9]+$'
 GROUP BY CAST(qb.knowledge_point_ids AS UNSIGNED);
 
--- ---------- 4) 专项学习会话（依赖 course_section 有数据；若无则本段插入 0 行） ----------
+-- ---------- 4) 专项学习会话（依赖 course_section 有数据；若无则本段插入 0 行）
+--     时长与预估分钟、小节多维哈希挂钩，避免 id 线性规律 ----------
 INSERT INTO user_learning_session (user_id, section_id, start_at, end_at, duration_sec, device_info, created_at)
 SELECT
   @uid,
   cs.id,
-  DATE_SUB(NOW(), INTERVAL (MOD(cs.id, 18) + 1) DAY),
-  DATE_SUB(NOW(), INTERVAL (MOD(cs.id, 18) + 1) DAY) + INTERVAL (15 + MOD(cs.id, 40)) MINUTE,
-  600 + MOD(cs.id, 1200),
+  DATE_SUB(NOW(), INTERVAL (1 + MOD(ABS(CRC32(CONCAT('u1ss0|', cs.id))), 18)) DAY),
+  DATE_SUB(NOW(), INTERVAL (1 + MOD(ABS(CRC32(CONCAT('u1ss0|', cs.id))), 18)) DAY)
+    + INTERVAL GREATEST(5, 8 + MOD(ABS(CRC32(CONCAT('u1ss1|', cs.id))), 55)) MINUTE,
+  GREATEST(
+    240,
+    LEAST(
+      5400,
+      FLOOR(GREATEST(1, IFNULL(cs.estimated_minutes, 20)) * 60 * (0.2 + MOD(ABS(CRC32(CONCAT('u1dur|', cs.id))), 72) / 100.0))
+    )
+  ),
   'web',
-  DATE_SUB(NOW(), INTERVAL (MOD(cs.id, 18) + 1) DAY)
+  DATE_SUB(NOW(), INTERVAL (1 + MOD(ABS(CRC32(CONCAT('u1ss0|', cs.id))), 18)) DAY)
 FROM course_section cs
+WHERE cs.is_active = 1
 ORDER BY cs.id
 LIMIT 18;
 
@@ -135,17 +144,23 @@ SELECT
   @route_id,
   'section',
   t.section_id,
-  CONCAT('错题指向：巩固「', t.title, '」相关概念与例题'),
-  1 + MOD(t.section_id, 3),
-  18 + MOD(t.section_id, 15),
+  CONCAT(
+    '错题指向：巩固「', t.title, '」',
+    ELT(1 + MOD(t.section_id, 3), '（概念+例题）', '（变式训练）', '（限时复盘）'),
+    '；建议投入约 ', t.estimated_minutes, ' 分钟'
+  ),
+  1 + MOD(ABS(CRC32(CONCAT('u1pri|', t.section_id))), 4),
+  GREATEST(10, LEAST(75, t.estimated_minutes + MOD(ABS(CRC32(CONCAT('u1adj|', t.section_id))), 9) - 4)),
   t.sort_no,
-  CASE WHEN MOD(t.section_id, 4) = 0 THEN 1 ELSE 0 END
+  CASE WHEN MOD(ABS(CRC32(CONCAT('u1cmp|', t.section_id))), 5) = 0 THEN 1 ELSE 0 END
 FROM (
   SELECT
     cs.id AS section_id,
     cs.title,
+    cs.estimated_minutes,
     ROW_NUMBER() OVER (ORDER BY cs.id) AS sort_no
   FROM course_section cs
+  WHERE cs.is_active = 1
   ORDER BY cs.id
   LIMIT 6
 ) t;

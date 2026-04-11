@@ -1,7 +1,13 @@
 package com.zjut.graduate.Dao;
 
 import com.zjut.graduate.Po.MistakeAnalysis;
-import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Options;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface MistakeAnalysisDao {
@@ -20,4 +26,12 @@ public interface MistakeAnalysisDao {
     @Update("UPDATE mistake_analysis SET error_type = #{errorType}, suggestion = #{suggestion}, " +
             "raw_llm_output = #{rawLlmOutput}, updated_at = NOW() WHERE id = #{id}")
     int update(MistakeAnalysis analysis);
+
+    /**
+     * 删除某题对应练习记录上的错题分析（先于 learning_record 删除）。
+     */
+    @Delete("DELETE ma FROM mistake_analysis ma " +
+            "INNER JOIN learning_record lr ON lr.id = ma.record_id " +
+            "WHERE lr.question_id = #{questionId}")
+    int deleteByQuestionId(@Param("questionId") Long questionId);
 }

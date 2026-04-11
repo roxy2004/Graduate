@@ -29,7 +29,8 @@ public class QuestionManageController {
         if (file == null || file.isEmpty()) {
             return error("请上传CSV文件");
         }
-        int count = questionBankService.importQuestionsFromCsv(file);
+        Long userId = (Long) session.getAttribute("userId");
+        int count = questionBankService.importQuestionsFromCsv(file, userId);
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
         response.put("message", "导入成功");
@@ -96,7 +97,11 @@ public class QuestionManageController {
         map.put("options", question.getOptions());
         map.put("correctAnswer", question.getCorrectAnswer());
         map.put("difficulty", question.getDifficulty());
+        map.put("questionType", question.getQuestionType());
+        map.put("sourceTag", question.getSourceTag());
+        map.put("status", question.getStatus());
         map.put("knowledgePointIds", question.getKnowledgePointIds());
+        map.put("createdBy", question.getCreatedBy());
         map.put("createdAt", question.getCreatedAt());
         return map;
     }

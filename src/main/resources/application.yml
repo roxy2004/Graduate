@@ -1,3 +1,10 @@
+graduate:
+  schema:
+    # 启动时若缺少 learning_resource.chapter_id 则自动 ALTER（不需要可改为 false）
+    auto-ensure-learning-resource-chapter-id: true
+    # 启动时若缺少 course_section.chapter_id 则自动 ADD 并按原 sort_no 规则回填
+    auto-ensure-course-section-chapter-id: true
+
 spring:
   application:
     name:Graduate

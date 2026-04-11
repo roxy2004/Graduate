@@ -29,6 +29,15 @@ WHERE lr.user_id = @uid;
 DELETE FROM learning_route_feedback WHERE user_id = @uid;
 DELETE FROM learning_route WHERE user_id = @uid;
 
+-- 0) 小节预估时长（分钟）：初始值按小节互不相同，约 8～178
+UPDATE course_section cs
+SET estimated_minutes = GREATEST(8, LEAST(178,
+  10
+  + MOD(cs.id, 9) * 7
+  + MOD(ABS(CRC32(CONCAT('em|', cs.id, '|', IFNULL(cs.course_id, 0), '|', IFNULL(cs.chapter_id, 0), '|', IFNULL(cs.sort_no, 0)))), 72)
+))
+WHERE cs.is_active = 1;
+
 -- 1) learning_record
 INSERT INTO learning_record
 (user_id, question_id, user_answer, is_correct, score, time_spent, attempt_no, answered_at, created_at)
@@ -104,47 +113,115 @@ INNER JOIN question_knowledge_point_rel qkr ON qkr.question_id = qb.id
 WHERE lr.user_id = @uid
 GROUP BY qkr.kp_id;
 
--- 4) user_learning_progress
+-- 4) user_learning_progress：每小节已学秒数、完成度、最近学习时间初始值互不相同
 INSERT INTO user_learning_progress
 (user_id, section_id, progress_percent, total_seconds, completed, last_learned_at, created_at, updated_at)
 SELECT
   @uid,
-  cs.id,
-  LEAST(100, 30 + MOD(cs.id * 13, 70)) AS progress_percent,
-  900 + MOD(cs.id * 83, 4800) AS total_seconds,
-  CASE WHEN MOD(cs.id, 4) = 0 THEN 1 ELSE 0 END AS completed,
-  DATE_SUB(NOW(), INTERVAL MOD(cs.id, 9) DAY) AS last_learned_at,
+  x.section_id,
+  LEAST(100, GREATEST(0, ROUND(100 * LEAST(1.0, x.ratio)))) AS progress_percent,
+  GREATEST(
+    40,
+    LEAST(
+      x.estimated_minutes * 120,
+      FLOOR(GREATEST(1, x.estimated_minutes) * 60 * LEAST(1.2, x.ratio))
+        + MOD(ABS(CRC32(CONCAT('tsj|', x.section_id, '|', @uid))), 240)
+    )
+  ) AS total_seconds,
+  CASE WHEN x.ratio >= 0.91 THEN 1 ELSE 0 END AS completed,
+  DATE_SUB(
+    DATE_SUB(
+      DATE_SUB(
+        NOW(),
+        INTERVAL (1 + MOD(ABS(CRC32(CONCAT('lld|', x.section_id, '|', IFNULL(x.chapter_id, 0)))), 52)) DAY
+      ),
+      INTERVAL MOD(ABS(CRC32(CONCAT('llh|', x.section_id, '|', @uid))), 47) HOUR
+    ),
+    INTERVAL MOD(ABS(CRC32(CONCAT('llm|', x.section_id))), 59) MINUTE
+  ) AS last_learned_at,
   NOW(),
   NOW()
-FROM course_section cs
-ORDER BY cs.id;
+FROM (
+  SELECT
+    cs.id AS section_id,
+    cs.estimated_minutes,
+    cs.chapter_id,
+    LEAST(1.2, GREATEST(0.05,
+      0.04 + (MOD(ABS(CRC32(CONCAT('ratio|', cs.id, '|', IFNULL(cs.chapter_id, 0), '|', IFNULL(cs.sort_no, 0), '|', IFNULL(cs.course_id, 0)))), 956) / 1000.0) * 1.12
+    )) AS ratio
+  FROM course_section cs
+  WHERE cs.is_active = 1
+) x
+ORDER BY x.section_id;
 
--- 5) user_learning_note
+-- 5) user_learning_note：每小节笔记条数 0～4 不等，正文与时间戳随条号变化
 INSERT INTO user_learning_note
 (user_id, section_id, note_content, note_time_sec, created_at, updated_at)
 SELECT
   @uid,
-  p.section_id,
-  CONCAT('笔记：', cs.title, '；重点关注定义、复杂度、典型陷阱。'),
-  60 + MOD(p.section_id * 17, 900),
+  x.section_id,
+  CONCAT(
+    '[#', k.seq, '/', x.note_cnt, '] ',
+    '[标签:', ELT(1 + MOD(x.section_id + k.seq, 5), '概念', '证明', '实现', '易错', '综合'), '] ',
+    cs.title,
+    ' | 自评/预估耗时比 ', ROUND(p.total_seconds / GREATEST(60, cs.estimated_minutes * 60), 2),
+    ' | ',
+    ELT(
+      1 + MOD(ABS(CRC32(CONCAT('nbody|', x.section_id, '|', k.seq, '|', IFNULL(cs.chapter_id, 0)))), 8),
+      '需二刷：例题边界仍未完全掌握。',
+      '已理解主流程，准备做相关中等题巩固。',
+      '疑问：复杂度分析里低阶项是否可忽略？',
+      '收获：整理思维导图，准备口述复盘。',
+      '卡点：递归出口与迭代写法易混。',
+      '计划：本周内各做一套限时小测。',
+      '提醒：与前一节符号定义冲突需注意。',
+      '拓展：补充阅读两篇背景材料。'
+    )
+  ),
+  12 + MOD(ABS(CRC32(CONCAT('nts|', x.section_id, '|', k.seq, '|', @uid))), 4180) AS note_time_sec,
   NOW(),
   NOW()
-FROM user_learning_progress p
-INNER JOIN course_section cs ON cs.id = p.section_id
-WHERE p.user_id = @uid;
+FROM (
+  SELECT
+    cs.id AS section_id,
+    MOD(ABS(CRC32(CONCAT('ncnt|', cs.id, '|', IFNULL(cs.course_id, 0), '|', IFNULL(cs.chapter_id, 0)))), 5) AS note_cnt
+  FROM course_section cs
+  WHERE cs.is_active = 1
+) x
+INNER JOIN course_section cs ON cs.id = x.section_id
+INNER JOIN user_learning_progress p ON p.section_id = x.section_id AND p.user_id = @uid
+CROSS JOIN (
+  SELECT 1 AS seq
+  UNION ALL SELECT 2
+  UNION ALL SELECT 3
+  UNION ALL SELECT 4
+) k
+WHERE k.seq >= 1
+  AND k.seq <= x.note_cnt
+ORDER BY x.section_id, k.seq;
 
--- 6) user_learning_session
+-- 6) user_learning_session：单次会话时长与预估相关且按小节独立哈希
 INSERT INTO user_learning_session
 (user_id, section_id, start_at, end_at, duration_sec, device_info, created_at)
 SELECT
   @uid,
   cs.id,
-  DATE_SUB(NOW(), INTERVAL MOD(cs.id, 12) DAY) + INTERVAL MOD(cs.id * 37, 3600) SECOND,
-  DATE_SUB(NOW(), INTERVAL MOD(cs.id, 12) DAY) + INTERVAL (1200 + MOD(cs.id * 29, 2600)) SECOND,
-  1200 + MOD(cs.id * 29, 2600),
+  DATE_SUB(NOW(), INTERVAL (1 + MOD(ABS(CRC32(CONCAT('ss0|', cs.id))), 22)) DAY)
+    + INTERVAL MOD(ABS(CRC32(CONCAT('ss1|', cs.id))), 5400) SECOND AS start_at,
+  DATE_SUB(NOW(), INTERVAL (1 + MOD(ABS(CRC32(CONCAT('ss0|', cs.id))), 22)) DAY)
+    + INTERVAL (MOD(ABS(CRC32(CONCAT('ss1|', cs.id))), 5400)
+      + GREATEST(300, LEAST(6500, FLOOR(GREATEST(1, cs.estimated_minutes) * 60 * (0.22 + MOD(ABS(CRC32(CONCAT('dur|', cs.id))), 68) / 100.0))))) SECOND AS end_at,
+  GREATEST(
+    200,
+    LEAST(
+      7200,
+      FLOOR(GREATEST(1, cs.estimated_minutes) * 60 * (0.22 + MOD(ABS(CRC32(CONCAT('dur|', cs.id))), 68) / 100.0))
+    )
+  ) AS duration_sec,
   'web',
   NOW()
 FROM course_section cs
+WHERE cs.is_active = 1
 ORDER BY cs.id;
 
 -- 7) learning_route + items + feedback
@@ -161,9 +238,14 @@ SELECT
   @route_id,
   'section',
   t.section_id,
-  CONCAT('建议学习：', t.title),
-  1 + MOD(t.section_id, 3),
-  20 + MOD(t.section_id, 20),
+  CONCAT(
+    '路线项#', t.rn,
+    ' 建议学习「', t.title, '」',
+    ELT(1 + MOD(t.section_id, 4), '（优先概念）', '（优先练习）', '（查漏补缺）', '（综合巩固）'),
+    '；参考课时约 ', t.estimated_minutes, ' 分钟'
+  ),
+  1 + MOD(ABS(CRC32(CONCAT('pri|', t.section_id))), 4),
+  GREATEST(8, LEAST(90, t.estimated_minutes + MOD(ABS(CRC32(CONCAT('adj|', t.section_id))), 11) - 5)),
   t.rn,
   CASE WHEN t.rn <= 2 THEN 1 ELSE 0 END,
   NOW()
@@ -171,8 +253,10 @@ FROM (
   SELECT
     cs.id AS section_id,
     cs.title,
+    cs.estimated_minutes,
     ROW_NUMBER() OVER (ORDER BY cs.id) AS rn
   FROM course_section cs
+  WHERE cs.is_active = 1
 ) t;
 
 INSERT INTO learning_route_feedback

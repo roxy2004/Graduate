@@ -6,7 +6,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 public interface QuestionBankService {
-    int importQuestionsFromCsv(MultipartFile file);
+    int importQuestionsFromCsv(MultipartFile file, Long createdByUserId);
 
     List<QuestionBank> listAllQuestions();
 

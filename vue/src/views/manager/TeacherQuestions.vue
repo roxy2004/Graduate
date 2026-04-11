@@ -16,16 +16,19 @@
           <el-button type="success">批量导入题目（CSV）</el-button>
         </el-upload>
         <span class="import-tip">
-          模板：content,image_url,options,correct_answer,difficulty,knowledge_point_ids
+          CSV：content, image_url, options, correct_answer, difficulty, knowledge_point_ids；可选 source_tag
         </span>
       </div>
 
       <el-table :data="questions" style="width: 100%; margin-top: 12px;">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="content" label="题干" min-width="420" show-overflow-tooltip />
+        <el-table-column prop="content" label="题干" min-width="360" show-overflow-tooltip />
+        <el-table-column prop="questionType" label="题型" width="100" />
         <el-table-column prop="correctAnswer" label="答案" width="90" />
         <el-table-column prop="difficulty" label="难度" width="100" />
-        <el-table-column prop="knowledgePointIds" label="知识点ID" width="160" />
+        <el-table-column prop="sourceTag" label="来源" width="140" show-overflow-tooltip />
+        <el-table-column prop="status" label="状态" width="72" />
+        <el-table-column prop="knowledgePointIds" label="知识点ID" width="140" />
         <el-table-column label="删除" width="120">
           <template #default="scope">
             <el-button type="danger" plain @click="deleteQuestion(scope.row.id)">删除</el-button>
