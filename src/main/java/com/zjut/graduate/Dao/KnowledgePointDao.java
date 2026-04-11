@@ -11,6 +11,18 @@ public interface KnowledgePointDao {
     @Select("SELECT * FROM knowledge_point WHERE id = #{id}")
     KnowledgePoint selectById(Long id);
 
+    @Select("SELECT id FROM knowledge_point WHERE name = #{name} ORDER BY id ASC LIMIT 1")
+    Long selectIdByExactName(@Param("name") String name);
+
+    /**
+     * CSV 导入：按固定 id 创建或更新知识点（满足 question_knowledge_point_rel 外键）。
+     */
+    @Insert("INSERT INTO knowledge_point (id, name, category, description, difficulty_ref, created_at, updated_at) " +
+            "VALUES (#{id}, #{name}, '教师导入', 'CSV批量导入自动创建', 0.50, NOW(), NOW()) " +
+            "ON DUPLICATE KEY UPDATE name = VALUES(name), category = VALUES(category), " +
+            "description = VALUES(description), difficulty_ref = VALUES(difficulty_ref), updated_at = NOW()")
+    int upsertById(@Param("id") Long id, @Param("name") String name);
+
     @Select("SELECT * FROM knowledge_point")
     List<KnowledgePoint> selectAll();
 

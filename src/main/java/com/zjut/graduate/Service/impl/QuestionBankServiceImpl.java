@@ -1,10 +1,14 @@
 package com.zjut.graduate.Service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zjut.graduate.Dao.CourseSectionDao;
+import com.zjut.graduate.Dao.KnowledgePointDao;
 import com.zjut.graduate.Dao.LearningRecordDao;
 import com.zjut.graduate.Dao.MistakeAnalysisDao;
 import com.zjut.graduate.Dao.QuestionBankDao;
 import com.zjut.graduate.Dao.QuestionKnowledgePointRelDao;
+import com.zjut.graduate.Po.CourseSection;
+import com.zjut.graduate.Po.KnowledgePoint;
 import com.zjut.graduate.Po.QuestionBank;
 import com.zjut.graduate.Service.QuestionBankService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,13 +23,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class QuestionBankServiceImpl implements QuestionBankService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    /** 与课程小节 id 对齐的练习知识点 id：88000000 + course_section.id */
+    private static final long SYNTHETIC_KP_BASE = 88_000_000L;
 
     @Autowired
     private QuestionBankDao questionBankDao;
@@ -34,12 +44,19 @@ public class QuestionBankServiceImpl implements QuestionBankService {
     private QuestionKnowledgePointRelDao questionKnowledgePointRelDao;
 
     @Autowired
+    private KnowledgePointDao knowledgePointDao;
+
+    @Autowired
+    private CourseSectionDao courseSectionDao;
+
+    @Autowired
     private MistakeAnalysisDao mistakeAnalysisDao;
 
     @Autowired
     private LearningRecordDao learningRecordDao;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int importQuestionsFromCsv(MultipartFile file, Long createdByUserId) {
         if (file == null || file.isEmpty()) {
             return 0;
@@ -59,20 +76,24 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 }
                 List<String> cols = parseCsvLine(line);
                 Map<String, String> row = toRowMap(headers, cols);
-                if (isBlank(row.get("content"))) {
+                if (isBlank(getValue(row, "content"))) {
                     continue;
                 }
-                QuestionBank question = new QuestionBank();
-                question.setContent(row.get("content").trim());
-                question.setImageUrl(emptyToNull(getValue(row, "image_url", "imageUrl")));
                 String options = resolveOptions(row);
                 if (isBlank(options)) {
                     continue;
                 }
+                String correctRaw = getValue(row, "correct_answer", "correctAnswer").trim();
+                if (isBlank(correctRaw)) {
+                    continue;
+                }
+                QuestionBank question = new QuestionBank();
+                question.setContent(getValue(row, "content").trim());
+                question.setImageUrl(emptyToNull(getValue(row, "image_url", "imageUrl")));
                 question.setOptions(options);
-                question.setCorrectAnswer(getValue(row, "correct_answer", "correctAnswer").trim().toUpperCase());
+                question.setCorrectAnswer(correctRaw.toUpperCase());
                 question.setDifficulty(parseDifficulty(getValue(row, "difficulty")));
-                question.setKnowledgePointIds(getValue(row, "knowledge_point_ids", "knowledgePointIds").trim());
+                question.setKnowledgePointIds(getValue(row, "knowledge_point_ids", "knowledgePointIds", "kp_ids").trim());
                 question.setQuestionType("choice");
                 String sourceTag = emptyToNull(getValue(row, "source_tag", "sourceTag"));
                 question.setSourceTag(sourceTag != null ? sourceTag : "教师导入");
@@ -80,7 +101,7 @@ public class QuestionBankServiceImpl implements QuestionBankService {
                 question.setCreatedBy(createdByUserId);
                 question.setCreatedAt(new Date());
                 questionBankDao.insert(question);
-                saveKnowledgePointRelations(question.getId(), question.getKnowledgePointIds());
+                saveKnowledgePointRelations(question.getId(), row);
                 importedCount++;
             }
         } catch (IOException e) {
@@ -106,31 +127,139 @@ public class QuestionBankServiceImpl implements QuestionBankService {
         return questionBankDao.deleteById(questionId) > 0;
     }
 
-    private void saveKnowledgePointRelations(Long questionId, String knowledgePointIdsCsv) {
-        if (questionId == null || isBlank(knowledgePointIdsCsv)) {
+    /**
+     * 学生刷题依赖 question_knowledge_point_rel + question_bank.status=1。
+     * 支持：knowledge_point_ids；knowledge_point_name(s)（按名称匹配或自动新建）；
+     * course_section_id / section_id（自动挂到 88000000+小节id 对应知识点，与小节标题同步）。
+     */
+    private void saveKnowledgePointRelations(Long questionId, Map<String, String> row) {
+        if (questionId == null) {
             return;
         }
-        for (String part : knowledgePointIdsCsv.split(",")) {
-            if (isBlank(part)) {
-                continue;
-            }
+        Set<Long> kpIds = new LinkedHashSet<>();
+
+        String sectionRaw = getValue(row, "course_section_id", "section_id", "小节id").trim();
+        if (!isBlank(sectionRaw)) {
             try {
-                long kpId = Long.parseLong(part.trim());
-                questionKnowledgePointRelDao.insert(questionId, kpId);
+                long sid = Long.parseLong(sectionRaw);
+                CourseSection cs = courseSectionDao.selectActiveById(sid);
+                if (cs != null) {
+                    long syntheticId = SYNTHETIC_KP_BASE + sid;
+                    String title = cs.getTitle() == null ? "" : cs.getTitle().trim();
+                    String kpName = title.isEmpty() ? ("小节" + sid + "【练习】") : (title + "【练习】");
+                    knowledgePointDao.upsertById(syntheticId, kpName);
+                    kpIds.add(syntheticId);
+                }
             } catch (NumberFormatException ignored) {
-                // 跳过非法知识点 ID
+                // 忽略非法小节 id
             }
         }
+
+        String nameHint = getValue(row, "knowledge_point_name", "knowledgePointName").trim();
+        String idsCsv = getValue(row, "knowledge_point_ids", "knowledgePointIds", "kp_ids").trim();
+        if (!isBlank(idsCsv)) {
+            for (String part : idsCsv.split("[,，]")) {
+                if (isBlank(part)) {
+                    continue;
+                }
+                try {
+                    long kpId = Long.parseLong(part.trim());
+                    ensureKnowledgePointForNumericId(kpId, nameHint);
+                    kpIds.add(kpId);
+                } catch (NumberFormatException ignored) {
+                    // 跳过非数字
+                }
+            }
+        }
+
+        String namesBlob = getValue(row, "knowledge_point_names", "knowledgePointNames").trim();
+        if (isBlank(namesBlob)) {
+            namesBlob = nameHint;
+        }
+        if (!isBlank(namesBlob)) {
+            for (String part : namesBlob.split("[,，;；]")) {
+                if (isBlank(part)) {
+                    continue;
+                }
+                Long id = resolveOrCreateKnowledgePointByName(part.trim());
+                if (id != null) {
+                    kpIds.add(id);
+                }
+            }
+        }
+
+        for (Long kpId : kpIds) {
+            if (knowledgePointDao.selectById(kpId) == null) {
+                continue;
+            }
+            if (questionKnowledgePointRelDao.countByQuestionAndKp(questionId, kpId) > 0) {
+                continue;
+            }
+            questionKnowledgePointRelDao.insert(questionId, kpId);
+        }
+    }
+
+    private void ensureKnowledgePointForNumericId(long kpId, String nameHint) {
+        if (knowledgePointDao.selectById(kpId) != null) {
+            return;
+        }
+        String name = !isBlank(nameHint) ? nameHint.trim() : ("教师导入-知识点" + kpId);
+        knowledgePointDao.upsertById(kpId, name);
+    }
+
+    private Long resolveOrCreateKnowledgePointByName(String name) {
+        if (isBlank(name)) {
+            return null;
+        }
+        Long id = knowledgePointDao.selectIdByExactName(name);
+        if (id != null) {
+            return id;
+        }
+        if (!name.contains("【练习】")) {
+            id = knowledgePointDao.selectIdByExactName(name + "【练习】");
+            if (id != null) {
+                return id;
+            }
+        } else {
+            String stripped = name.replace("【练习】", "").trim();
+            if (!stripped.isEmpty()) {
+                id = knowledgePointDao.selectIdByExactName(stripped);
+                if (id != null) {
+                    return id;
+                }
+            }
+        }
+        KnowledgePoint kp = new KnowledgePoint();
+        kp.setName(name.trim());
+        knowledgePointDao.insert(kp);
+        return kp.getId();
     }
 
     private Map<String, String> toRowMap(List<String> headers, List<String> values) {
         Map<String, String> map = new HashMap<>();
         for (int i = 0; i < headers.size(); i++) {
-            String key = headers.get(i) == null ? "" : headers.get(i).trim();
+            String key = normalizeCsvHeader(headers.get(i));
             String value = i < values.size() ? values.get(i) : "";
-            map.put(key, value == null ? "" : value);
+            if (value != null && !value.isEmpty() && value.charAt(0) == '\uFEFF') {
+                value = value.substring(1);
+            }
+            value = value == null ? "" : value;
+            if (!key.isEmpty()) {
+                map.put(key, value);
+            }
         }
         return map;
+    }
+
+    private static String normalizeCsvHeader(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String s = raw.trim();
+        if (!s.isEmpty() && s.charAt(0) == '\uFEFF') {
+            s = s.substring(1).trim();
+        }
+        return s.toLowerCase(Locale.ROOT);
     }
 
     private String resolveOptions(Map<String, String> row) {
@@ -165,8 +294,10 @@ public class QuestionBankServiceImpl implements QuestionBankService {
 
     private String getValue(Map<String, String> row, String... keys) {
         for (String key : keys) {
-            if (row.containsKey(key)) {
-                return row.get(key);
+            String k = key.toLowerCase(Locale.ROOT);
+            if (row.containsKey(k)) {
+                String v = row.get(k);
+                return v == null ? "" : v;
             }
         }
         return "";

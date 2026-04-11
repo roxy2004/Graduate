@@ -16,7 +16,9 @@
           <el-button type="success">批量导入题目（CSV）</el-button>
         </el-upload>
         <span class="import-tip">
-          CSV：content, image_url, options, correct_answer, difficulty, knowledge_point_ids；可选 source_tag
+          CSV 请用 UTF-8。列：content, image_url, options 或 A/B/C/D, correct_answer, difficulty；
+          分类至少填一种——knowledge_point_ids（知识点 id，可多个逗号分隔）、或 knowledge_point_name / knowledge_point_names（名称，可自动建知识点）、或 course_section_id（小节 id，自动挂到 88000000+该 id 的练习知识点）；
+          可选 source_tag
         </span>
       </div>
 
