@@ -1,2 +1,0 @@
--- 已弃用：请执行 learning_resource_topic_urls.sql
--- 保留此文件仅为避免旧脚本名误导；实际更新见 learning_resource_topic_urls.sql

@@ -4,6 +4,11 @@ graduate:
     auto-ensure-learning-resource-chapter-id: true
     # 启动时若缺少 course_section.chapter_id 则自动 ADD 并按原 sort_no 规则回填
     auto-ensure-course-section-chapter-id: true
+  # 学生端 DeepSeek 对话（OpenAI 兼容接口，与 spring-ai 块共用环境变量即可）
+  deepseek:
+    base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.deepseek.com}
+    api-key: ${SPRING_AI_OPENAI_API_KEY:sk-899d816989214d4282e2d8e792af6a43}
+    model: ${SPRING_AI_OPENAI_MODEL:deepseek-chat}
 
 spring:
   application:
@@ -24,7 +29,7 @@ spring-ai:
   provider: openai-compatible
   openai:
     base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.deepseek.com}
-    api-key: ${SPRING_AI_OPENAI_API_KEY:}
+    api-key: ${SPRING_AI_OPENAI_API_KEY:sk-899d816989214d4282e2d8e792af6a43}
     chat:
       options:
         model: ${SPRING_AI_OPENAI_MODEL:deepseek-chat}

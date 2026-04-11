@@ -22,6 +22,7 @@
     <div class="manager-content">
       <RouterView />
     </div>
+    <StudentDeepSeekChat v-if="user?.role === 'student'" />
   </div>
 </template>
 
@@ -29,6 +30,7 @@
 import { computed } from "vue";
 import { useRouter } from "vue-router";
 import request from "@/utils/request";
+import StudentDeepSeekChat from "@/components/StudentDeepSeekChat.vue";
 
 const router = useRouter();
 const user = computed(() => JSON.parse(localStorage.getItem("user") || "null"));
