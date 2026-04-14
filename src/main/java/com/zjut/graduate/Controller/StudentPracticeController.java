@@ -1,5 +1,6 @@
 package com.zjut.graduate.Controller;
 
+import com.zjut.graduate.Service.PracticeWrongTutorService;
 import com.zjut.graduate.Service.StudentPracticeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,9 @@ public class StudentPracticeController {
 
     @Autowired
     private StudentPracticeService studentPracticeService;
+
+    @Autowired
+    private PracticeWrongTutorService practiceWrongTutorService;
 
     @GetMapping("/knowledge-points")
     public Map<String, Object> listKnowledgePoints(HttpSession session) {
@@ -96,6 +100,34 @@ public class StudentPracticeController {
         String userAnswer = body == null ? null : String.valueOf(body.getOrDefault("userAnswer", ""));
         Integer timeSpent = parseInt(body == null ? null : body.get("timeSpent"));
         return studentPracticeService.submitAttempt(userId, kpId, questionId, userAnswer, timeSpent);
+    }
+
+    @PostMapping("/knowledge-points/{kpId}/wrong-tutor")
+    public Map<String, Object> wrongTutor(@PathVariable("kpId") Long kpId,
+                                          @RequestBody Map<String, Object> body,
+                                          HttpSession session) {
+        Map<String, Object> authError = requireStudent(session);
+        if (authError != null) {
+            return authError;
+        }
+        Long userId = (Long) session.getAttribute("userId");
+        Long questionId = parseLong(body == null ? null : body.get("questionId"));
+        String userAnswer = body == null ? null : String.valueOf(body.getOrDefault("userAnswer", ""));
+        return practiceWrongTutorService.explainWrongAnswer(userId, kpId, questionId, userAnswer);
+    }
+
+    @PostMapping("/knowledge-points/{kpId}/favorite-tutor-note")
+    public Map<String, Object> favoriteTutorNote(@PathVariable("kpId") Long kpId,
+                                                  @RequestBody Map<String, Object> body,
+                                                  HttpSession session) {
+        Map<String, Object> authError = requireStudent(session);
+        if (authError != null) {
+            return authError;
+        }
+        Long userId = (Long) session.getAttribute("userId");
+        Long questionId = parseLong(body == null ? null : body.get("questionId"));
+        String content = body == null ? null : String.valueOf(body.getOrDefault("content", ""));
+        return practiceWrongTutorService.favoriteTutorNote(userId, kpId, questionId, content);
     }
 
     @DeleteMapping("/knowledge-points/{kpId}/records")

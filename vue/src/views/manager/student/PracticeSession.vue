@@ -87,6 +87,51 @@
         <el-button type="primary" plain :disabled="currentIndex >= deck.length - 1" @click="go(1)">下一题</el-button>
       </div>
     </template>
+
+    <el-dialog
+      v-model="tutorVisible"
+      title="错题解析与知识点笔记"
+      width="640px"
+      destroy-on-close
+      class="tutor-dialog"
+      @closed="resetTutor"
+    >
+      <div v-loading="tutorLoading" class="tutor-body">
+        <template v-if="!tutorLoading && tutorData">
+          <p v-if="tutorData.targetSectionTitle" class="tutor-meta">
+            笔记将归入小节：<strong>{{ tutorData.targetSectionTitle }}</strong>
+          </p>
+          <el-alert
+            v-if="tutorData.canFavorite === false"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="tutor-warn"
+            title="未匹配到专项学习小节"
+            description="未找到与知识点名称有包含关系的小节。可执行 sql/migrate_knowledge_point_anchor_section.sql 并配置 anchor_section_id，或让小节标题与知识点名有部分重合。"
+          />
+          <div class="tutor-block">
+            <div class="tutor-h">解析</div>
+            <div class="tutor-text">{{ tutorData.explanation || "（无）" }}</div>
+          </div>
+          <div class="tutor-block">
+            <div class="tutor-h">知识点笔记</div>
+            <div class="tutor-text pre-wrap">{{ tutorData.knowledgeNotes || "（无）" }}</div>
+          </div>
+          <div class="tutor-actions">
+            <el-button
+              type="warning"
+              plain
+              :disabled="!tutorData.canFavorite || tutorSaving || !((tutorData.knowledgeNotes || '').trim())"
+              :loading="tutorSaving"
+              @click="favoriteTutorNote"
+            >
+              收藏知识点笔记
+            </el-button>
+          </div>
+        </template>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -112,6 +157,12 @@ const currentIndex = ref(0);
 const picked = reactive({});
 const localResult = reactive({});
 const submittingId = ref(null);
+
+const tutorVisible = ref(false);
+const tutorLoading = ref(false);
+const tutorSaving = ref(false);
+const tutorData = ref(null);
+const tutorQuestionId = ref(null);
 
 const touchStartX = ref(0);
 
@@ -283,6 +334,70 @@ const formatTime = (raw) => {
   return d.toLocaleString();
 };
 
+const resetTutor = () => {
+  tutorData.value = null;
+  tutorQuestionId.value = null;
+};
+
+const fetchWrongTutor = async (item, userAnswer) => {
+  tutorVisible.value = true;
+  tutorLoading.value = true;
+  tutorData.value = null;
+  tutorQuestionId.value = item.id;
+  try {
+    const resp = await request.post(
+      `/xwd/student/practice/knowledge-points/${kpId.value}/wrong-tutor`,
+      { questionId: item.id, userAnswer },
+      { timeout: 120000 }
+    );
+    if (resp?.status === "success") {
+      tutorData.value = {
+        explanation: resp.explanation || "",
+        knowledgeNotes: resp.knowledgeNotes || "",
+        kpName: resp.kpName || "",
+        canFavorite: !!resp.canFavorite,
+        targetSectionTitle: resp.targetSectionTitle || "",
+      };
+    } else {
+      ElMessage.error(resp?.message || "获取解析失败");
+      tutorVisible.value = false;
+    }
+  } catch (e) {
+    ElMessage.error("获取解析失败");
+    tutorVisible.value = false;
+  } finally {
+    tutorLoading.value = false;
+  }
+};
+
+const favoriteTutorNote = async () => {
+  if (!tutorData.value || tutorQuestionId.value == null) return;
+  const d = tutorData.value;
+  const body = (d.knowledgeNotes || "").trim();
+  if (!body) {
+    ElMessage.warning("当前没有可收藏的知识点笔记内容");
+    return;
+  }
+  tutorSaving.value = true;
+  try {
+    const resp = await request.post(`/xwd/student/practice/knowledge-points/${kpId.value}/favorite-tutor-note`, {
+      questionId: tutorQuestionId.value,
+      content: body,
+    });
+    if (resp?.status === "success") {
+      ElMessage.success(resp.message || "已收藏");
+      tutorVisible.value = false;
+      resetTutor();
+    } else {
+      ElMessage.error(resp?.message || "收藏失败");
+    }
+  } catch (e) {
+    ElMessage.error("收藏失败");
+  } finally {
+    tutorSaving.value = false;
+  }
+};
+
 const submit = async (item) => {
   const qid = item.id;
   const ans = picked[qid];
@@ -323,6 +438,9 @@ const submit = async (item) => {
       await loadSummary();
       questionPageEnteredAt[qid] = Date.now();
       ElMessage.success(ok ? "回答正确" : "回答错误，已记录");
+      if (!ok) {
+        void fetchWrongTutor(item, ans);
+      }
     } else {
       ElMessage.error(resp?.message || "提交失败");
     }
@@ -584,5 +702,41 @@ onBeforeUnmount(() => {
 .fresh-result.bad {
   background: #fef2f2;
   color: #991b1b;
+}
+
+.tutor-body {
+  min-height: 120px;
+}
+.tutor-meta {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 12px;
+}
+.tutor-warn {
+  margin-bottom: 12px;
+}
+.tutor-block {
+  margin-bottom: 14px;
+}
+.tutor-h {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin-bottom: 6px;
+}
+.tutor-text {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #0f172a;
+}
+.tutor-text.pre-wrap {
+  white-space: pre-wrap;
+}
+.tutor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
 }
 </style>
