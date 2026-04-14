@@ -70,6 +70,12 @@ public interface LearningRecordDao {
                               @Param("timeSpent") int timeSpent,
                               @Param("attemptNo") int attemptNo);
 
+    @Insert("INSERT INTO learning_record (user_id, question_id, user_answer, is_correct, score, time_spent, attempt_no, answered_at, created_at) " +
+            "VALUES (#{userId}, #{questionId}, #{userAnswer}, #{isCorrect}, " +
+            "CASE WHEN #{isCorrect} = 1 THEN 5.00 ELSE 0.00 END, #{timeSpent}, #{attemptNo}, NOW(), NOW())")
+    @Options(useGeneratedKeys = true, keyProperty = "id", keyColumn = "id")
+    int insertPracticeAttemptReturningId(LearningRecord record);
+
     @Delete("DELETE ma FROM mistake_analysis ma " +
             "INNER JOIN learning_record lr ON lr.id = ma.record_id " +
             "INNER JOIN question_knowledge_point_rel qkr ON qkr.question_id = lr.question_id AND qkr.kp_id = #{kpId} " +
@@ -82,7 +88,13 @@ public interface LearningRecordDao {
     int deleteLearningRecordsByUserAndKp(@Param("userId") Long userId, @Param("kpId") Long kpId);
 
     @Select("SELECT lr.id, lr.question_id, qb.content, qb.options, qb.correct_answer, lr.user_answer, lr.is_correct, " +
-            "ma.error_type, kp.name AS knowledge_point, lr.created_at " +
+            "ma.error_type, ma.suggestion, " +
+            "COALESCE(kp.name, (" +
+            "SELECT GROUP_CONCAT(kp2.name ORDER BY qkr.kp_id SEPARATOR '、') " +
+            "FROM question_knowledge_point_rel qkr " +
+            "INNER JOIN knowledge_point kp2 ON kp2.id = qkr.kp_id " +
+            "WHERE qkr.question_id = lr.question_id" +
+            ")) AS knowledge_point, lr.created_at " +
             "FROM learning_record lr " +
             "LEFT JOIN question_bank qb ON lr.question_id = qb.id " +
             "LEFT JOIN mistake_analysis ma ON ma.record_id = lr.id " +

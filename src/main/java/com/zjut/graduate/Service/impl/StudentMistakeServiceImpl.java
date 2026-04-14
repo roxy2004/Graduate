@@ -1,6 +1,7 @@
 package com.zjut.graduate.Service.impl;
 
 import com.zjut.graduate.Dao.LearningRecordDao;
+import com.zjut.graduate.Service.MistakeDeepAnalysisService;
 import com.zjut.graduate.Service.StudentMistakeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,9 +16,29 @@ public class StudentMistakeServiceImpl implements StudentMistakeService {
     @Autowired
     private LearningRecordDao learningRecordDao;
 
+    @Autowired
+    private MistakeDeepAnalysisService mistakeDeepAnalysisService;
+
     @Override
     public List<Map<String, Object>> listMistakes(Long userId) {
-        return learningRecordDao.selectMistakesByUserId(userId);
+        List<Map<String, Object>> list = learningRecordDao.selectMistakesByUserId(userId);
+        int enqueued = 0;
+        final int maxBackfill = 5;
+        for (Map<String, Object> row : list) {
+            if (enqueued >= maxBackfill) {
+                break;
+            }
+            Object sug = row.get("suggestion");
+            if (sug != null && !String.valueOf(sug).trim().isEmpty()) {
+                continue;
+            }
+            Object id = row.get("id");
+            if (id instanceof Number) {
+                mistakeDeepAnalysisService.analyzeAsync(((Number) id).longValue());
+                enqueued++;
+            }
+        }
+        return list;
     }
 
     @Override
@@ -40,6 +61,9 @@ public class StudentMistakeServiceImpl implements StudentMistakeService {
         String correctAnswer = detail.get("correct_answer") == null ? "" : detail.get("correct_answer").toString();
         boolean isCorrect = correctAnswer.equalsIgnoreCase(answer.trim());
         learningRecordDao.updateRedoResult(recordId, userId, answer.trim().toUpperCase(), isCorrect ? 1 : 0);
+        if (!isCorrect) {
+            mistakeDeepAnalysisService.analyzeAsync(recordId);
+        }
 
         result.put("status", "success");
         result.put("isCorrect", isCorrect);

@@ -18,4 +18,7 @@ public interface QuestionKnowledgePointRelDao {
 
     @Select("SELECT COUNT(1) FROM question_knowledge_point_rel WHERE question_id = #{questionId} AND kp_id = #{kpId}")
     int countByQuestionAndKp(@Param("questionId") Long questionId, @Param("kpId") Long kpId);
+
+    @Select("SELECT kp_id FROM question_knowledge_point_rel WHERE question_id = #{questionId} ORDER BY kp_id ASC LIMIT 1")
+    Long selectFirstKpIdByQuestionId(@Param("questionId") Long questionId);
 }

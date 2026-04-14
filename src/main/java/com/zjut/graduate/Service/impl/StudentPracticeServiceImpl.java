@@ -5,11 +5,15 @@ import com.zjut.graduate.Dao.LearningRecordDao;
 import com.zjut.graduate.Dao.QuestionBankDao;
 import com.zjut.graduate.Dao.QuestionKnowledgePointRelDao;
 import com.zjut.graduate.Po.KnowledgePoint;
+import com.zjut.graduate.Po.LearningRecord;
 import com.zjut.graduate.Po.QuestionBank;
+import com.zjut.graduate.Service.MistakeDeepAnalysisService;
 import com.zjut.graduate.Service.StudentPracticeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,6 +35,9 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
 
     @Autowired
     private LearningRecordDao learningRecordDao;
+
+    @Autowired
+    private MistakeDeepAnalysisService mistakeDeepAnalysisService;
 
     @Override
     public List<Map<String, Object>> listKnowledgePointPracticeSummary(Long userId) {
@@ -154,7 +161,27 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
         int isCorrect = correct.equalsIgnoreCase(ua) ? 1 : 0;
         int ts = timeSpent == null ? 0 : Math.max(0, Math.min(timeSpent, 3600));
         int attemptNo = learningRecordDao.selectMaxAttemptNo(userId, questionId) + 1;
-        learningRecordDao.insertPracticeAttempt(userId, questionId, ua, isCorrect, ts, attemptNo);
+        LearningRecord rec = new LearningRecord();
+        rec.setUserId(userId);
+        rec.setQuestionId(questionId);
+        rec.setUserAnswer(ua);
+        rec.setIsCorrect(isCorrect);
+        rec.setTimeSpent(ts);
+        rec.setAttemptNo(attemptNo);
+        learningRecordDao.insertPracticeAttemptReturningId(rec);
+        if (isCorrect == 0 && rec.getId() != null) {
+            final Long newRecordId = rec.getId();
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        mistakeDeepAnalysisService.analyzeAsync(newRecordId);
+                    }
+                });
+            } else {
+                mistakeDeepAnalysisService.analyzeAsync(newRecordId);
+            }
+        }
         out.put("status", "success");
         out.put("isCorrect", isCorrect == 1);
         out.put("correctAnswer", correct.toUpperCase());

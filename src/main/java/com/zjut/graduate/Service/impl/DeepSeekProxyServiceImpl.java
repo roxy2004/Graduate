@@ -46,16 +46,36 @@ public class DeepSeekProxyServiceImpl implements DeepSeekProxyService {
     }
 
     @Override
+    public boolean isConfigured() {
+        return apiKey != null && !apiKey.trim().isEmpty();
+    }
+
+    @Override
     public String chat(List<Map<String, Object>> clientMessages) throws Exception {
-        if (apiKey == null || apiKey.trim().isEmpty()) {
+        requireApiKey();
+        List<Map<String, String>> messages = normalizeMessages(clientMessages);
+        return executeChat(messages, 0.6);
+    }
+
+    @Override
+    public String chatDirect(List<Map<String, String>> messages, double temperature) throws Exception {
+        requireApiKey();
+        List<Map<String, String>> normalized = validateDirectMessages(messages);
+        return executeChat(normalized, temperature);
+    }
+
+    private void requireApiKey() {
+        if (!isConfigured()) {
             throw new IllegalStateException("未配置 DeepSeek API Key，请在环境变量 SPRING_AI_OPENAI_API_KEY 或 graduate.deepseek.api-key 中设置");
         }
-        List<Map<String, String>> messages = normalizeMessages(clientMessages);
+    }
+
+    private String executeChat(List<Map<String, String>> messages, double temperature) throws Exception {
         String url = buildChatUrl();
         Map<String, Object> body = new HashMap<>();
         body.put("model", model.trim());
         body.put("messages", messages);
-        body.put("temperature", 0.6);
+        body.put("temperature", temperature);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -82,6 +102,42 @@ public class DeepSeekProxyServiceImpl implements DeepSeekProxyService {
             base = base + "/v1";
         }
         return base + "/chat/completions";
+    }
+
+    private List<Map<String, String>> validateDirectMessages(List<Map<String, String>> messages) {
+        if (messages == null || messages.isEmpty()) {
+            throw new IllegalArgumentException("messages 不能为空");
+        }
+        List<Map<String, String>> out = new ArrayList<>();
+        for (Map<String, String> row : messages) {
+            if (row == null) {
+                continue;
+            }
+            String role = row.get("role");
+            String content = row.get("content");
+            if (role == null || content == null) {
+                continue;
+            }
+            role = role.trim().toLowerCase(Locale.ROOT);
+            if (!"system".equals(role) && !"user".equals(role) && !"assistant".equals(role)) {
+                continue;
+            }
+            content = content.trim();
+            if (content.isEmpty()) {
+                continue;
+            }
+            if (content.length() > MAX_CONTENT_LEN) {
+                content = content.substring(0, MAX_CONTENT_LEN);
+            }
+            Map<String, String> m = new LinkedHashMap<>();
+            m.put("role", role);
+            m.put("content", content);
+            out.add(m);
+        }
+        if (out.isEmpty()) {
+            throw new IllegalArgumentException("无有效的对话消息");
+        }
+        return out;
     }
 
     private List<Map<String, String>> normalizeMessages(List<Map<String, Object>> clientMessages) {

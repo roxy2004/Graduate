@@ -18,12 +18,12 @@ public interface MistakeAnalysisDao {
     MistakeAnalysis selectByRecordId(Long recordId);
 
     @Insert("INSERT INTO mistake_analysis (record_id, user_id, kp_id, error_type, weakness_score, suggestion, raw_llm_output, created_at, updated_at) " +
-            "VALUES (#{recordId}, (SELECT user_id FROM learning_record WHERE id = #{recordId}), NULL, #{errorType}, 0.60, " +
+            "VALUES (#{recordId}, (SELECT user_id FROM learning_record WHERE id = #{recordId}), #{kpId}, #{errorType}, 0.60, " +
             "#{suggestion}, #{rawLlmOutput}, #{createdAt}, NOW())")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(MistakeAnalysis analysis);
 
-    @Update("UPDATE mistake_analysis SET error_type = #{errorType}, suggestion = #{suggestion}, " +
+    @Update("UPDATE mistake_analysis SET kp_id = #{kpId}, error_type = #{errorType}, suggestion = #{suggestion}, " +
             "raw_llm_output = #{rawLlmOutput}, updated_at = NOW() WHERE id = #{id}")
     int update(MistakeAnalysis analysis);
 

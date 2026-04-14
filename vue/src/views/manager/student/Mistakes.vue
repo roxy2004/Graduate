@@ -33,6 +33,12 @@
           </div>
         </div>
 
+        <div v-if="item.suggestion" class="suggestion-box">
+          <div class="suggestion-title">学习建议（大模型）</div>
+          <div class="suggestion-body">{{ item.suggestion }}</div>
+        </div>
+        <div v-else class="suggestion-pending">智能分析生成中，可稍后点击「刷新」查看建议。</div>
+
         <div class="redo-row">
           <el-radio-group v-model="redoAnswers[item.id]">
             <el-radio-button label="A" />
@@ -79,6 +85,12 @@
             <span class="option-text">{{ opt.value }}</span>
           </div>
         </div>
+
+        <div v-if="currentItem.suggestion" class="suggestion-box">
+          <div class="suggestion-title">学习建议（大模型）</div>
+          <div class="suggestion-body">{{ currentItem.suggestion }}</div>
+        </div>
+        <div v-else class="suggestion-pending">智能分析生成中，可稍后刷新。</div>
 
         <div class="batch-actions">
           <div class="left">
@@ -328,6 +340,34 @@ onMounted(() => {
 .option-wrong {
   background: rgba(239, 68, 68, 0.16);
   border-color: rgba(239, 68, 68, 0.45);
+}
+
+.suggestion-box {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 100%);
+}
+
+.suggestion-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #3730a3;
+  margin-bottom: 8px;
+}
+
+.suggestion-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #1e293b;
+  white-space: pre-wrap;
+}
+
+.suggestion-pending {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #94a3b8;
 }
 
 .redo-row {
