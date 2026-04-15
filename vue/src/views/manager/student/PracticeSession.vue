@@ -1,15 +1,18 @@
 <template>
   <div class="session-page page-shell">
     <div class="top-bar">
-      <el-button text type="primary" @click="back">← 返回知识点</el-button>
+      <el-button text type="primary" @click="back">← 返回练习中心</el-button>
       <div v-if="summary" class="summary">
-        {{ summary.name || "知识点" }} · 已刷 {{ practiced }} / {{ total }} 题
+        <template v-if="isRandomDeck">{{ randomSummaryText }}</template>
+        <template v-else>{{ summary.name || "知识点" }} · 已刷 {{ practiced }} / {{ total }} 题</template>
       </div>
-      <el-button type="danger" plain size="small" @click="clearRecords">清空本题集记录</el-button>
+      <el-button v-if="!isRandomDeck" type="danger" plain size="small" @click="clearRecords">清空本题集记录</el-button>
     </div>
 
     <div v-if="loading" class="placeholder">加载题目…</div>
-    <div v-else-if="deck.length === 0" class="placeholder">该知识点下暂无可用题目。</div>
+    <div v-else-if="deck.length === 0" class="placeholder">
+      {{ isRandomDeck ? "没有可抽的「未做过」题目了（可能都已练过），可先去知识点练习或等教师补充新题。" : "该知识点下暂无可用题目。" }}
+    </div>
     <template v-else>
       <div class="pager-row">
         <span class="pager">{{ currentIndex + 1 }} / {{ deck.length }}</span>
@@ -47,7 +50,10 @@
               </div>
 
               <div class="card-face">
-                <div class="card-tag">{{ item.questionType || "选择题" }}</div>
+                <div class="card-tag-row">
+                  <span class="card-tag">{{ item.questionType || "选择题" }}</span>
+                  <span v-if="isRandomDeck && item.knowledgePointName" class="kp-chip">{{ item.knowledgePointName }}</span>
+                </div>
                 <div class="stem">{{ item.content || "（无题干）" }}</div>
               </div>
 
@@ -147,7 +153,24 @@ const questionPageEnteredAt = reactive({});
 const route = useRoute();
 const router = useRouter();
 
-const kpId = computed(() => Number(route.params.kpId));
+const isRandomDeck = computed(() => route.name === "StudentPracticeRandom");
+
+const kpId = computed(() => {
+  const raw = route.params.kpId;
+  if (raw == null || raw === "") return NaN;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : NaN;
+});
+
+const resolveKpIdForQuestion = (item) => {
+  if (isRandomDeck.value) {
+    const k = item?.knowledgePointId ?? item?.knowledge_point_id;
+    const n = Number(k);
+    return Number.isFinite(n) ? n : null;
+  }
+  const n = kpId.value;
+  return Number.isFinite(n) ? n : null;
+};
 
 const loading = ref(true);
 const summary = ref(null);
@@ -226,6 +249,17 @@ const practiced = computed(() =>
 );
 const total = computed(() => Number(summary.value?.totalQuestions ?? summary.value?.total_questions ?? 0));
 
+const randomSubmittedCount = computed(() => {
+  if (!isRandomDeck.value) return 0;
+  return deck.value.filter((d) => localResult[d.id]).length;
+});
+
+const randomSummaryText = computed(() => {
+  const n = deck.value.length;
+  const done = randomSubmittedCount.value;
+  return `随机小练（跨知识点）· 本轮 ${n} 题 · 已提交 ${done}`;
+});
+
 const stripStyle = computed(() => {
   const n = deck.value.length || 1;
   return {
@@ -255,6 +289,14 @@ const recordFor = (item) => {
 };
 
 const loadSummary = async () => {
+  if (isRandomDeck.value) {
+    summary.value = {
+      name: "随机小练",
+      totalQuestions: 10,
+      practicedQuestions: 0,
+    };
+    return;
+  }
   try {
     const resp = await request.get(`/xwd/student/practice/knowledge-points/${kpId.value}/summary`);
     if (resp?.status === "success") {
@@ -268,7 +310,12 @@ const loadSummary = async () => {
 const loadDeck = async () => {
   loading.value = true;
   try {
-    const resp = await request.get(`/xwd/student/practice/knowledge-points/${kpId.value}/deck`);
+    let resp;
+    if (isRandomDeck.value) {
+      resp = await request.get("/xwd/student/practice/random-deck?limit=10");
+    } else {
+      resp = await request.get(`/xwd/student/practice/knowledge-points/${kpId.value}/deck`);
+    }
     if (resp?.status === "success") {
       const rows = resp.data || [];
       deck.value = rows.map((r) => {
@@ -280,8 +327,26 @@ const loadDeck = async () => {
                 ...la,
                 timeSpent: la.timeSpent ?? la.time_spent ?? null,
               };
-        return { ...r, lastAttempt: normalizedLast };
+        const kpid = r.knowledgePointId ?? r.knowledge_point_id;
+        const kpName = r.knowledgePointName ?? r.knowledge_point_name ?? "";
+        let kpNum = null;
+        if (kpid != null && kpid !== "") {
+          const n = Number(kpid);
+          if (Number.isFinite(n)) kpNum = n;
+        }
+        return {
+          ...r,
+          lastAttempt: normalizedLast,
+          knowledgePointId: kpNum,
+          knowledgePointName: kpName,
+        };
       });
+      if (isRandomDeck.value && summary.value) {
+        summary.value = {
+          ...summary.value,
+          totalQuestions: deck.value.length,
+        };
+      }
       Object.keys(picked).forEach((k) => delete picked[k]);
       Object.keys(localResult).forEach((k) => delete localResult[k]);
       currentIndex.value = 0;
@@ -344,9 +409,16 @@ const fetchWrongTutor = async (item, userAnswer) => {
   tutorLoading.value = true;
   tutorData.value = null;
   tutorQuestionId.value = item.id;
+  const kid = resolveKpIdForQuestion(item);
+  if (kid == null) {
+    ElMessage.error("题目缺少知识点信息");
+    tutorVisible.value = false;
+    tutorLoading.value = false;
+    return;
+  }
   try {
     const resp = await request.post(
-      `/xwd/student/practice/knowledge-points/${kpId.value}/wrong-tutor`,
+      `/xwd/student/practice/knowledge-points/${kid}/wrong-tutor`,
       { questionId: item.id, userAnswer },
       { timeout: 120000 }
     );
@@ -379,8 +451,14 @@ const favoriteTutorNote = async () => {
     return;
   }
   tutorSaving.value = true;
+  const deckItem = deck.value.find((x) => x.id === tutorQuestionId.value);
+  const kid = resolveKpIdForQuestion(deckItem || {});
+  if (kid == null) {
+    ElMessage.error("题目缺少知识点信息");
+    return;
+  }
   try {
-    const resp = await request.post(`/xwd/student/practice/knowledge-points/${kpId.value}/favorite-tutor-note`, {
+    const resp = await request.post(`/xwd/student/practice/knowledge-points/${kid}/favorite-tutor-note`, {
       questionId: tutorQuestionId.value,
       content: body,
     });
@@ -409,8 +487,14 @@ const submit = async (item) => {
   const started = questionPageEnteredAt[qid];
   const timeSpentSec =
     started == null ? 0 : Math.max(0, Math.min(3600, Math.floor((Date.now() - started) / 1000)));
+  const kid = resolveKpIdForQuestion(item);
+  if (kid == null) {
+    ElMessage.error("题目缺少知识点信息，无法提交");
+    submittingId.value = null;
+    return;
+  }
   try {
-    const resp = await request.post(`/xwd/student/practice/knowledge-points/${kpId.value}/attempts`, {
+    const resp = await request.post(`/xwd/student/practice/knowledge-points/${kid}/attempts`, {
       questionId: qid,
       userAnswer: ans,
       timeSpent: timeSpentSec,
@@ -435,7 +519,9 @@ const submit = async (item) => {
         };
         row.correctAnswer = ca;
       }
-      await loadSummary();
+      if (!isRandomDeck.value) {
+        await loadSummary();
+      }
       questionPageEnteredAt[qid] = Date.now();
       ElMessage.success(ok ? "回答正确" : "回答错误，已记录");
       if (!ok) {
@@ -497,7 +583,7 @@ const back = () => {
 };
 
 watch(
-  () => route.params.kpId,
+  () => [route.name, route.params.kpId],
   async () => {
     await loadSummary();
     await loadDeck();
@@ -617,10 +703,29 @@ onBeforeUnmount(() => {
   background: linear-gradient(165deg, #ffffff 0%, #f4f8ff 100%);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
 }
+.card-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
 .card-tag {
   font-size: 12px;
   font-weight: 600;
   color: #2563eb;
+}
+.kp-chip {
+  font-size: 11px;
+  font-weight: 700;
+  color: #4338ca;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  padding: 3px 10px;
+  border-radius: 999px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .stem {
   margin-top: 10px;

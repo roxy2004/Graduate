@@ -109,4 +109,21 @@ public interface QuestionBankDao {
             "WHERE qb.status = 1 " +
             "ORDER BY (lrj.answered_at IS NULL) DESC, lrj.answered_at ASC, qb.id ASC")
     List<Map<String, Object>> selectPracticeDeckRows(@Param("kpId") Long kpId, @Param("userId") Long userId);
+
+    /**
+     * 跨知识点随机练习条：从全库已上架且关联了知识点的题目中随机抽取；排除当前用户在 learning_record 中已有作答的题目。
+     * 每题附带用于校验提交关系的主知识点 id（取该题关联的最小 kp_id）。
+     */
+    @Select("SELECT qb.id, qb.content, qb.question_type AS questionType, qb.options, qb.difficulty, qb.source_tag AS sourceTag, " +
+            "qb.correct_answer AS correctAnswer, " +
+            "(SELECT MIN(rel2.kp_id) FROM question_knowledge_point_rel rel2 WHERE rel2.question_id = qb.id) AS knowledgePointId, " +
+            "NULL AS lastUserAnswer, NULL AS lastIsCorrect, NULL AS lastAnsweredAt, NULL AS lastTimeSpent " +
+            "FROM question_bank qb " +
+            "WHERE qb.status = 1 " +
+            "AND EXISTS (SELECT 1 FROM question_knowledge_point_rel rel WHERE rel.question_id = qb.id) " +
+            "AND NOT EXISTS (SELECT 1 FROM learning_record lr " +
+            "  WHERE lr.user_id = #{userId} AND lr.question_id = qb.id) " +
+            "ORDER BY RAND() " +
+            "LIMIT #{limit}")
+    List<Map<String, Object>> selectRandomCrossKpPracticeDeckRows(@Param("userId") Long userId, @Param("limit") int limit);
 }

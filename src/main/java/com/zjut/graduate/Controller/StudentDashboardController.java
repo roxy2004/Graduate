@@ -34,6 +34,21 @@ public class StudentDashboardController {
         return response;
     }
 
+    @GetMapping("/profile")
+    public Map<String, Object> getLearnerProfile(HttpSession session) {
+        Map<String, Object> authError = requireStudent(session);
+        if (authError != null) {
+            return authError;
+        }
+        Long userId = (Long) session.getAttribute("userId");
+        Map<String, Object> data = studentDashboardService.getLearnerProfile(userId);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("data", data);
+        return response;
+    }
+
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {

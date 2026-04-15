@@ -52,6 +52,22 @@ public class StudentPracticeController {
         return response;
     }
 
+    @GetMapping("/random-deck")
+    public Map<String, Object> randomCrossKpDeck(@RequestParam(value = "limit", defaultValue = "10") int limit,
+                                                 HttpSession session) {
+        Map<String, Object> authError = requireStudent(session);
+        if (authError != null) {
+            return authError;
+        }
+        Long userId = (Long) session.getAttribute("userId");
+        int n = Math.max(1, Math.min(limit, 50));
+        List<Map<String, Object>> data = studentPracticeService.getRandomCrossKpPracticeDeck(userId, n);
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("data", data);
+        return response;
+    }
+
     @GetMapping("/knowledge-points/{kpId}/deck")
     public Map<String, Object> practiceDeck(@PathVariable("kpId") Long kpId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);

@@ -42,6 +42,15 @@ public interface LearningRecordDao {
     @Select("SELECT COUNT(DISTINCT DATE(created_at)) FROM learning_record WHERE user_id = #{userId}")
     int countLearningDaysByUserId(@Param("userId") Long userId);
 
+    @Select("SELECT qkr.kp_id AS kpId, COUNT(*) AS practicedCount, " +
+            "SUM(CASE WHEN lr.is_correct = 1 THEN 1 ELSE 0 END) AS correctCount, " +
+            "MAX(lr.created_at) AS lastPracticedAt " +
+            "FROM learning_record lr " +
+            "INNER JOIN question_knowledge_point_rel qkr ON qkr.question_id = lr.question_id " +
+            "WHERE lr.user_id = #{userId} " +
+            "GROUP BY qkr.kp_id")
+    List<Map<String, Object>> selectKnowledgePracticeStatsByUserId(@Param("userId") Long userId);
+
     @Select("SELECT lr.id, lr.question_id, qb.content, lr.user_answer, lr.is_correct, lr.time_spent, lr.created_at " +
             "FROM learning_record lr LEFT JOIN question_bank qb ON lr.question_id = qb.id " +
             "WHERE lr.user_id = #{userId} ORDER BY lr.created_at DESC")

@@ -49,7 +49,7 @@ import { nextTick, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import request from "@/utils/request";
 
-const minimized = ref(false);
+const minimized = ref(true);
 const messages = ref([]);
 const draft = ref("");
 const loading = ref(false);

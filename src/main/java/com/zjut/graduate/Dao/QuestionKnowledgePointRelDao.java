@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.List;
+
 @Mapper
 public interface QuestionKnowledgePointRelDao {
 
@@ -21,4 +23,7 @@ public interface QuestionKnowledgePointRelDao {
 
     @Select("SELECT kp_id FROM question_knowledge_point_rel WHERE question_id = #{questionId} ORDER BY kp_id ASC LIMIT 1")
     Long selectFirstKpIdByQuestionId(@Param("questionId") Long questionId);
+
+    @Select("SELECT kp_id FROM question_knowledge_point_rel WHERE question_id = #{questionId} ORDER BY kp_id ASC")
+    List<Long> selectKpIdsByQuestionId(@Param("questionId") Long questionId);
 }

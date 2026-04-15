@@ -1,10 +1,12 @@
 package com.zjut.graduate.Service.impl;
 
 import com.zjut.graduate.Dao.KnowledgePointDao;
+import com.zjut.graduate.Dao.LearnerKnowledgeStateDao;
 import com.zjut.graduate.Dao.LearningRecordDao;
 import com.zjut.graduate.Dao.QuestionBankDao;
 import com.zjut.graduate.Dao.QuestionKnowledgePointRelDao;
 import com.zjut.graduate.Po.KnowledgePoint;
+import com.zjut.graduate.Po.LearnerKnowledgeState;
 import com.zjut.graduate.Po.LearningRecord;
 import com.zjut.graduate.Po.QuestionBank;
 import com.zjut.graduate.Service.MistakeDeepAnalysisService;
@@ -16,6 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,6 +38,9 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
 
     @Autowired
     private LearningRecordDao learningRecordDao;
+
+    @Autowired
+    private LearnerKnowledgeStateDao learnerKnowledgeStateDao;
 
     @Autowired
     private MistakeDeepAnalysisService mistakeDeepAnalysisService;
@@ -80,6 +86,70 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
             item.put("options", col(row, "options"));
             item.put("difficulty", col(row, "difficulty"));
             item.put("sourceTag", col(row, "sourceTag"));
+            Object lua = col(row, "lastUserAnswer");
+            Object lic = col(row, "lastIsCorrect");
+            Object lat = col(row, "lastAnsweredAt");
+            Object lts = col(row, "lastTimeSpent");
+            Object ca = col(row, "correctAnswer");
+            if (lua != null && !String.valueOf(lua).trim().isEmpty()) {
+                Map<String, Object> la = new LinkedHashMap<>();
+                la.put("userAnswer", String.valueOf(lua).trim().toUpperCase());
+                boolean ok = false;
+                if (lic instanceof Number) {
+                    ok = ((Number) lic).intValue() == 1;
+                } else if (lic instanceof Boolean) {
+                    ok = (Boolean) lic;
+                }
+                la.put("isCorrect", ok);
+                la.put("answeredAt", lat);
+                Integer priorSec = null;
+                if (lts instanceof Number) {
+                    priorSec = Math.max(0, ((Number) lts).intValue());
+                }
+                la.put("timeSpent", priorSec);
+                item.put("lastAttempt", la);
+                item.put("correctAnswer", ca == null ? null : String.valueOf(ca).trim().toUpperCase());
+            } else {
+                item.put("lastAttempt", null);
+                item.put("correctAnswer", null);
+            }
+            out.add(item);
+        }
+        return out;
+    }
+
+    @Override
+    public List<Map<String, Object>> getRandomCrossKpPracticeDeck(Long userId, int limit) {
+        int n = Math.max(1, Math.min(limit, 50));
+        List<Map<String, Object>> raw = questionBankDao.selectRandomCrossKpPracticeDeckRows(userId, n);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : raw) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", col(row, "id"));
+            item.put("content", col(row, "content"));
+            item.put("questionType", col(row, "questionType"));
+            item.put("options", col(row, "options"));
+            item.put("difficulty", col(row, "difficulty"));
+            item.put("sourceTag", col(row, "sourceTag"));
+            Object kpid = col(row, "knowledgePointId");
+            if (kpid instanceof Number) {
+                item.put("knowledgePointId", ((Number) kpid).longValue());
+            } else if (kpid != null) {
+                try {
+                    item.put("knowledgePointId", Long.parseLong(String.valueOf(kpid).trim()));
+                } catch (NumberFormatException e) {
+                    item.put("knowledgePointId", null);
+                }
+            } else {
+                item.put("knowledgePointId", null);
+            }
+            Long kpIdForName = (Long) item.get("knowledgePointId");
+            if (kpIdForName != null) {
+                KnowledgePoint kp = knowledgePointDao.selectById(kpIdForName);
+                item.put("knowledgePointName", kp != null && kp.getName() != null ? kp.getName() : "");
+            } else {
+                item.put("knowledgePointName", "");
+            }
             Object lua = col(row, "lastUserAnswer");
             Object lic = col(row, "lastIsCorrect");
             Object lat = col(row, "lastAnsweredAt");
@@ -169,6 +239,7 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
         rec.setTimeSpent(ts);
         rec.setAttemptNo(attemptNo);
         learningRecordDao.insertPracticeAttemptReturningId(rec);
+        updateKnowledgeMastery(userId, questionId, isCorrect, qb.getDifficulty());
         if (isCorrect == 0 && rec.getId() != null) {
             final Long newRecordId = rec.getId();
             if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -186,6 +257,118 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
         out.put("isCorrect", isCorrect == 1);
         out.put("correctAnswer", correct.toUpperCase());
         return out;
+    }
+
+    private void updateKnowledgeMastery(Long userId, Long questionId, int isCorrect, Double difficulty) {
+        List<Long> kpIds = questionKnowledgePointRelDao.selectKpIdsByQuestionId(questionId);
+        if (kpIds == null || kpIds.isEmpty()) {
+            return;
+        }
+        Map<Long, Integer> practicedByKp = loadPracticedCountMap(userId);
+        double score = isCorrect == 1 ? 1.0 : 0.0;
+        Date now = new Date();
+
+        for (Long kpId : kpIds) {
+            if (kpId == null) {
+                continue;
+            }
+            int practiced = practicedByKp.getOrDefault(kpId, 0);
+            LearnerKnowledgeState state = learnerKnowledgeStateDao.selectByUserAndKp(userId, kpId);
+            if (state == null) {
+                LearnerKnowledgeState created = new LearnerKnowledgeState();
+                created.setUserId(userId);
+                created.setKpId(kpId);
+                // 冷启动：以 0.50 为基线，首题允许较快收敛但不激进。
+                created.setMasteryLevel(round2(applySmoothing(0.50, score, practiced, difficulty)));
+                created.setConfidence(0.60);
+                created.setLastPracticedAt(now);
+                created.setUpdatedAt(now);
+                learnerKnowledgeStateDao.insert(created);
+                continue;
+            }
+
+            double oldMastery = state.getMasteryLevel() == null ? 0.5 : state.getMasteryLevel();
+            double newMastery = applySmoothing(oldMastery, score, practiced, difficulty);
+            double confidence = smoothConfidence(state.getConfidence(), practiced);
+
+            state.setMasteryLevel(round2(newMastery));
+            state.setConfidence(round2(confidence));
+            state.setLastPracticedAt(now);
+            state.setUpdatedAt(now);
+            learnerKnowledgeStateDao.updateMastery(state);
+        }
+    }
+
+    private Map<Long, Integer> loadPracticedCountMap(Long userId) {
+        Map<Long, Integer> out = new HashMap<>();
+        List<Map<String, Object>> rows = learningRecordDao.selectKnowledgePracticeStatsByUserId(userId);
+        for (Map<String, Object> row : rows) {
+            Object kid = row.get("kpId");
+            if (!(kid instanceof Number)) {
+                continue;
+            }
+            long kpId = ((Number) kid).longValue();
+            Object c = row.get("practicedCount");
+            int practiced = c instanceof Number ? ((Number) c).intValue() : 0;
+            out.put(kpId, practiced);
+        }
+        return out;
+    }
+
+    /**
+     * 掌握度平滑策略（增强版）：
+     * 1) 自适应步长：练习越多，alpha 越小（避免成熟画像剧烈抖动）。
+     * 2) 难度加权：难题影响略大、简单题略小。
+     * 3) 单次限幅：限制每次更新的最大升降幅，抑制噪声。
+     */
+    private static double applySmoothing(double oldMastery, double score, int practiced, Double difficulty) {
+        double old = clamp01(oldMastery);
+        int p = Math.max(0, practiced);
+        double diff = difficulty == null ? 0.5 : clamp01(difficulty);
+
+        double baseAlpha;
+        if (p < 8) {
+            baseAlpha = 0.28;
+        } else if (p < 30) {
+            baseAlpha = 0.20;
+        } else {
+            baseAlpha = 0.14;
+        }
+        double difficultyFactor = 0.85 + 0.35 * diff; // 0.85 ~ 1.20
+        double alpha = clamp(baseAlpha * difficultyFactor, 0.08, 0.35);
+
+        double raw = old + alpha * (score - old);
+
+        double maxStep;
+        if (p < 10) {
+            maxStep = 0.12;
+        } else if (p < 30) {
+            maxStep = 0.08;
+        } else {
+            maxStep = 0.05;
+        }
+        double bounded = clamp(raw, old - maxStep, old + maxStep);
+        return clamp01(bounded);
+    }
+
+    private static double smoothConfidence(Double oldConfidence, int practiced) {
+        int p = Math.max(0, practiced);
+        double observed = 0.45 + 0.50 * Math.min(1.0, p / 40.0); // 0.45 ~ 0.95
+        observed = clamp(observed, 0.45, 0.95);
+        double old = oldConfidence == null ? observed : clamp(oldConfidence, 0.30, 0.95);
+        return 0.7 * old + 0.3 * observed;
+    }
+
+    private static double clamp01(double v) {
+        return clamp(v, 0.0, 1.0);
+    }
+
+    private static double clamp(double v, double lo, double hi) {
+        return Math.max(lo, Math.min(hi, v));
+    }
+
+    private static double round2(double v) {
+        return Math.round(v * 100D) / 100D;
     }
 
     @Override

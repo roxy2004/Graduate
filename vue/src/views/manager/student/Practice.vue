@@ -1,34 +1,57 @@
 <template>
   <div class="student-page page-shell">
-    <h2 class="page-title">练习中心</h2>
-    <p class="page-desc">按知识点刷题；未做过的题目优先。进入练习后将以卡片形式作答。</p>
-    <div class="toolbar">
-      <el-button type="primary" plain @click="loadList">刷新</el-button>
-    </div>
+    <header class="practice-header">
+      <div class="practice-header-text">
+        <h2 class="page-title">练习中心</h2>
+        <p class="page-desc">按知识点卡片刷题；未做过的题目优先。也可一键随机 10 题，题目可来自不同知识点。</p>
+      </div>
+      <el-button type="primary" plain class="refresh-btn" @click="loadList">刷新列表</el-button>
+    </header>
 
     <div v-if="loading" class="placeholder">加载中…</div>
-    <div v-else-if="list.length === 0" class="placeholder">暂无带题目的知识点，请教师导入题目并关联知识点。</div>
-    <div v-else class="kp-grid">
-      <div v-for="row in list" :key="rowKey(row)" class="kp-card">
-        <div class="kp-name">{{ row.name || "未命名" }}</div>
-        <div class="kp-meta">
-          已刷 <strong>{{ num(row.practicedQuestions ?? row.practiced_questions) }}</strong> /
-          共 <strong>{{ num(row.totalQuestions ?? row.total_questions) }}</strong> 题
+    <template v-else>
+      <section
+        v-if="hasAnyQuestions"
+        class="random-strip"
+        role="button"
+        tabindex="0"
+        @click="goRandomTen"
+        @keydown.enter.prevent="goRandomTen"
+      >
+        <div class="random-strip-icon" aria-hidden="true">10</div>
+        <div class="random-strip-body">
+          <div class="random-strip-title">随机 10 题</div>
+          <div class="random-strip-desc">从全库已上架题目中随机抽 10 道（仅未做过的题），可跨多个知识点。</div>
         </div>
-        <el-progress
-          :percentage="progressPct(row)"
-          :stroke-width="10"
-          :show-text="false"
-          class="kp-bar"
-        />
-        <el-button type="primary" plain class="kp-go" @click="goPractice(row)">卡片练习</el-button>
+        <el-button type="primary" class="random-strip-cta" @click.stop="goRandomTen">开始</el-button>
+      </section>
+
+      <div v-if="list.length === 0" class="placeholder muted">暂无带题目的知识点，请教师导入题目并关联知识点。</div>
+      <div v-else class="kp-grid">
+        <article v-for="row in list" :key="rowKey(row)" class="kp-card">
+          <div class="kp-card-top">
+            <h3 class="kp-title">{{ row.name || "未命名" }}</h3>
+            <div class="kp-stats">
+              <span class="pill">已刷 {{ num(row.practicedQuestions ?? row.practiced_questions) }}</span>
+              <span class="pill pill-total">共 {{ num(row.totalQuestions ?? row.total_questions) }} 题</span>
+            </div>
+          </div>
+          <el-progress
+            :percentage="progressPct(row)"
+            :stroke-width="8"
+            :show-text="false"
+            class="kp-progress"
+            color="#3b82f6"
+          />
+          <el-button type="primary" class="kp-action" @click="goPractice(row)">卡片练习</el-button>
+        </article>
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import request from "@/utils/request";
@@ -42,6 +65,8 @@ const num = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
+
+const hasAnyQuestions = computed(() => list.value.some((row) => num(row.totalQuestions ?? row.total_questions) > 0));
 
 const progressPct = (row) => {
   const total = num(row.totalQuestions ?? row.total_questions);
@@ -72,6 +97,14 @@ const goPractice = (row) => {
   router.push(`/manager/student/practice/kp/${id}`);
 };
 
+const goRandomTen = () => {
+  if (!hasAnyQuestions.value) {
+    ElMessage.warning("当前没有可练习的题目");
+    return;
+  }
+  router.push("/manager/student/practice/random");
+};
+
 onMounted(() => {
   loadList();
 });
@@ -79,58 +112,168 @@ onMounted(() => {
 
 <style scoped>
 .student-page {
-  padding: 16px;
+  padding: 20px 18px 28px;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.practice-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
 }
 .page-title {
-  margin: 0 0 6px;
-  font-size: 22px;
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   color: #0f172a;
 }
 .page-desc {
-  margin: 0 0 14px;
+  margin: 0;
+  max-width: 640px;
   color: #64748b;
   font-size: 14px;
+  line-height: 1.55;
 }
-.toolbar {
-  margin-bottom: 12px;
+.refresh-btn {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 .placeholder {
-  padding: 20px;
-  border: 1px dashed #c6d4ee;
-  border-radius: 10px;
+  padding: 28px 20px;
+  border-radius: 14px;
+  text-align: center;
   color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+}
+.placeholder.muted {
+  margin-top: 14px;
+  background: #fafafa;
+  border-color: #e2e8f0;
+}
+.random-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  margin-bottom: 22px;
+  border-radius: 16px;
+  cursor: pointer;
+  outline: none;
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(110deg, #eef2ff 0%, #e0f2fe 42%, #f8fafc 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 12px 32px rgba(37, 99, 235, 0.12);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.random-strip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 16px 40px rgba(37, 99, 235, 0.16);
+  border-color: #a5b4fc;
+}
+.random-strip:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.35), 0 12px 32px rgba(37, 99, 235, 0.12);
+}
+.random-strip-icon {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 18px;
+  color: #1e3a8a;
+  background: linear-gradient(145deg, #fff 0%, #e0e7ff 100%);
+  border: 1px solid #c7d2fe;
+}
+.random-strip-body {
+  flex: 1;
+  min-width: 0;
+}
+.random-strip-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+.random-strip-desc {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+}
+.random-strip-cta {
+  flex-shrink: 0;
+  padding-left: 22px;
+  padding-right: 22px;
+  border-radius: 10px;
+  font-weight: 700;
 }
 .kp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
 }
 .kp-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 14px;
-  background: #fbfdff;
+  border-radius: 16px;
+  padding: 18px 18px 16px;
+  background: #fff;
+  border: 1px solid #e8eef7;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.kp-card:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 14px 36px rgba(37, 99, 235, 0.1);
+  transform: translateY(-2px);
+}
+.kp-card-top {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.kp-name {
-  font-weight: 700;
-  color: #0f172a;
+.kp-title {
+  margin: 0;
   font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
-.kp-meta {
-  font-size: 13px;
+.kp-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.pill-total {
+  background: #f1f5f9;
   color: #475569;
 }
-.kp-meta strong {
-  color: #2563eb;
+.kp-progress {
+  margin-top: -4px;
 }
-.kp-bar {
-  margin-top: 4px;
-}
-.kp-go {
-  align-self: flex-start;
-  margin-top: 4px;
+.kp-action {
+  width: 100%;
+  margin-top: 2px;
+  border-radius: 10px;
+  font-weight: 700;
 }
 </style>
