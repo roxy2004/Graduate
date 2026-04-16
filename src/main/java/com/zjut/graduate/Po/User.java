@@ -7,6 +7,7 @@ public class User {
     private String username;
     private String password;
     private String role;
+    private String avatarUrl;
     private Date createdAt;
 
     public Long getId() {
@@ -39,6 +40,14 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 
     public Date getCreatedAt() {

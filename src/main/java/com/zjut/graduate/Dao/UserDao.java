@@ -13,6 +13,7 @@ public interface UserDao {
             @Result(column = "username", property = "username"),
             @Result(column = "password_hash", property = "password"),
             @Result(column = "role", property = "role"),
+            @Result(column = "avatar_url", property = "avatarUrl"),
             @Result(column = "created_at", property = "createdAt")
     })
     User selectById(Long id);
@@ -28,15 +29,18 @@ public interface UserDao {
     @Select("SELECT COUNT(1) FROM user WHERE username = #{username}")
     int countByUsername(String username);
 
-    @Insert("INSERT INTO user (username, password_hash, role, status, created_at, updated_at) " +
-            "VALUES (#{username}, #{password}, #{role}, 1, #{createdAt}, #{createdAt})")
+    @Insert("INSERT INTO user (username, password_hash, role, avatar_url, status, created_at, updated_at) " +
+            "VALUES (#{username}, #{password}, #{role}, #{avatarUrl}, 1, #{createdAt}, #{createdAt})")
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(User user);
 
     @Update("UPDATE user SET password_hash = #{password}, updated_at = NOW() WHERE id = #{id}")
     int updatePasswordById(@Param("id") Long id, @Param("password") String password);
 
-    @Update("UPDATE user SET username = #{username}, password_hash = #{password}, role = #{role}, " +
+    @Update("UPDATE user SET avatar_url = #{avatarUrl}, updated_at = NOW() WHERE id = #{id}")
+    int updateAvatarById(@Param("id") Long id, @Param("avatarUrl") String avatarUrl);
+
+    @Update("UPDATE user SET username = #{username}, password_hash = #{password}, role = #{role}, avatar_url = #{avatarUrl}, " +
             "created_at = #{createdAt}, updated_at = NOW() WHERE id = #{id}")
     int update(User user);
 

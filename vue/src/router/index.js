@@ -15,6 +15,7 @@ const router = createRouter({
         {path:'student/dashboard',component:()=>import('@/views/manager/student/Dashboard.vue')},
         {path:'student/learning',component:()=>import('@/views/manager/student/Learning.vue')},
         {path:'student/practice',component:()=>import('@/views/manager/student/Practice.vue')},
+        {path:'student/practice/daily',name:'StudentPracticeDaily',component:()=>import('@/views/manager/student/PracticeSession.vue')},
         {path:'student/practice/random',name:'StudentPracticeRandom',component:()=>import('@/views/manager/student/PracticeSession.vue')},
         {path:'student/practice/kp/:kpId',name:'StudentPracticeKp',component:()=>import('@/views/manager/student/PracticeSession.vue')},
         {path:'student/mistakes',component:()=>import('@/views/manager/student/Mistakes.vue')},

@@ -51,6 +51,7 @@ public class LoginController {
         safeUser.put("id", user.getId());
         safeUser.put("username", user.getUsername());
         safeUser.put("role", user.getRole());
+        safeUser.put("avatarUrl", user.getAvatarUrl());
         safeUser.put("createdAt", user.getCreatedAt());
         return safeUser;
     }

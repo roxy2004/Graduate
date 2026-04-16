@@ -4,14 +4,15 @@
       <el-button text type="primary" @click="back">← 返回练习中心</el-button>
       <div v-if="summary" class="summary">
         <template v-if="isRandomDeck">{{ randomSummaryText }}</template>
+        <template v-else-if="isDailyDeck">{{ dailySummaryText }}</template>
         <template v-else>{{ summary.name || "知识点" }} · 已刷 {{ practiced }} / {{ total }} 题</template>
       </div>
-      <el-button v-if="!isRandomDeck" type="danger" plain size="small" @click="clearRecords">清空本题集记录</el-button>
+      <el-button v-if="!isRandomDeck && !isDailyDeck" type="danger" plain size="small" @click="clearRecords">清空本题集记录</el-button>
     </div>
 
     <div v-if="loading" class="placeholder">加载题目…</div>
     <div v-else-if="deck.length === 0" class="placeholder">
-      {{ isRandomDeck ? "没有可抽的「未做过」题目了（可能都已练过），可先去知识点练习或等教师补充新题。" : "该知识点下暂无可用题目。" }}
+      {{ isRandomDeck ? "没有可抽的「未做过」题目了（可能都已练过），可先去知识点练习或等教师补充新题。" : (isDailyDeck ? "今日推荐暂无题目，可去推荐页刷新或明日再试。" : "该知识点下暂无可用题目。") }}
     </div>
     <template v-else>
       <div class="pager-row">
@@ -39,20 +40,27 @@
           >
             <div class="slide-inner">
               <div v-if="recordFor(item)" class="history-banner" :class="recordFor(item).isCorrect ? 'ok' : 'bad'">
-                最近一次作答：<strong>{{ recordFor(item).userAnswer }}</strong>
-                · {{ recordFor(item).isCorrect ? "正确" : "错误" }}
-                <span v-if="priorTimeSpentText(recordFor(item))" class="t-small">
-                  · {{ priorTimeSpentText(recordFor(item)) }}
-                </span>
-                <span v-if="recordFor(item).answeredAt" class="t-small">
-                  · {{ formatTime(recordFor(item).answeredAt) }}
-                </span>
+                <div class="history-head">
+                  <span>最近一次作答：{{ recordFor(item).isCorrect ? "正确" : "错误" }}</span>
+                  <el-button text size="small" class="history-toggle-btn" @click="toggleHistoryDetail(item.id)">
+                    {{ isHistoryDetailShown(item.id) ? "收起记录" : "展开记录" }}
+                  </el-button>
+                </div>
+                <div v-if="isHistoryDetailShown(item.id)" class="history-detail">
+                  你的答案：<strong>{{ recordFor(item).userAnswer }}</strong>
+                  <span v-if="priorTimeSpentText(recordFor(item))" class="t-small">
+                    · {{ priorTimeSpentText(recordFor(item)) }}
+                  </span>
+                  <span v-if="recordFor(item).answeredAt" class="t-small">
+                    · {{ formatTime(recordFor(item).answeredAt) }}
+                  </span>
+                </div>
               </div>
 
               <div class="card-face">
                 <div class="card-tag-row">
                   <span class="card-tag">{{ item.questionType || "选择题" }}</span>
-                  <span v-if="isRandomDeck && item.knowledgePointName" class="kp-chip">{{ item.knowledgePointName }}</span>
+                  <span v-if="(isRandomDeck || isDailyDeck) && item.knowledgePointName" class="kp-chip">{{ item.knowledgePointName }}</span>
                 </div>
                 <div class="stem">{{ item.content || "（无题干）" }}</div>
               </div>
@@ -154,6 +162,7 @@ const route = useRoute();
 const router = useRouter();
 
 const isRandomDeck = computed(() => route.name === "StudentPracticeRandom");
+const isDailyDeck = computed(() => route.name === "StudentPracticeDaily");
 
 const kpId = computed(() => {
   const raw = route.params.kpId;
@@ -162,8 +171,15 @@ const kpId = computed(() => {
   return Number.isFinite(n) ? n : NaN;
 });
 
+const targetQid = computed(() => {
+  const raw = route.query.qid;
+  if (raw == null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+});
+
 const resolveKpIdForQuestion = (item) => {
-  if (isRandomDeck.value) {
+  if (isRandomDeck.value || isDailyDeck.value) {
     const k = item?.knowledgePointId ?? item?.knowledge_point_id;
     const n = Number(k);
     return Number.isFinite(n) ? n : null;
@@ -180,6 +196,7 @@ const currentIndex = ref(0);
 const picked = reactive({});
 const localResult = reactive({});
 const submittingId = ref(null);
+const historyDetailShown = reactive({});
 
 const tutorVisible = ref(false);
 const tutorLoading = ref(false);
@@ -260,6 +277,12 @@ const randomSummaryText = computed(() => {
   return `随机小练（跨知识点）· 本轮 ${n} 题 · 已提交 ${done}`;
 });
 
+const dailySummaryText = computed(() => {
+  const n = deck.value.length;
+  const done = deck.value.filter((d) => localResult[d.id]).length;
+  return `每日推荐（10题）· 本轮 ${n} 题 · 已提交 ${done}`;
+});
+
 const stripStyle = computed(() => {
   const n = deck.value.length || 1;
   return {
@@ -289,9 +312,9 @@ const recordFor = (item) => {
 };
 
 const loadSummary = async () => {
-  if (isRandomDeck.value) {
+  if (isRandomDeck.value || isDailyDeck.value) {
     summary.value = {
-      name: "随机小练",
+      name: isDailyDeck.value ? "每日推荐" : "随机小练",
       totalQuestions: 10,
       practicedQuestions: 0,
     };
@@ -313,6 +336,8 @@ const loadDeck = async () => {
     let resp;
     if (isRandomDeck.value) {
       resp = await request.get("/xwd/student/practice/random-deck?limit=10");
+    } else if (isDailyDeck.value) {
+      resp = await request.get("/xwd/student/practice/daily-deck?limit=10");
     } else {
       resp = await request.get(`/xwd/student/practice/knowledge-points/${kpId.value}/deck`);
     }
@@ -341,7 +366,7 @@ const loadDeck = async () => {
           knowledgePointName: kpName,
         };
       });
-      if (isRandomDeck.value && summary.value) {
+      if ((isRandomDeck.value || isDailyDeck.value) && summary.value) {
         summary.value = {
           ...summary.value,
           totalQuestions: deck.value.length,
@@ -349,7 +374,14 @@ const loadDeck = async () => {
       }
       Object.keys(picked).forEach((k) => delete picked[k]);
       Object.keys(localResult).forEach((k) => delete localResult[k]);
+      Object.keys(historyDetailShown).forEach((k) => delete historyDetailShown[k]);
       currentIndex.value = 0;
+      if (targetQid.value != null) {
+        const idx = deck.value.findIndex((x) => Number(x.id) === targetQid.value);
+        if (idx >= 0) {
+          currentIndex.value = idx;
+        }
+      }
       markCurrentQuestionPageEntered();
     } else {
       deck.value = [];
@@ -375,12 +407,19 @@ const pick = (qid, key) => {
   picked[qid] = key;
 };
 
+const isHistoryDetailShown = (qid) => !!historyDetailShown[qid];
+
+const toggleHistoryDetail = (qid) => {
+  historyDetailShown[qid] = !historyDetailShown[qid];
+};
+
 const optionClass = (item, key) => {
   const rec = recordFor(item);
   const cls = [];
   const p = picked[item.id];
   if (p === key) cls.push("picked");
-  if (rec) {
+  const showHistoryOnOptions = isHistoryDetailShown(item.id);
+  if (rec && showHistoryOnOptions) {
     const ua = String(rec.userAnswer || "").toUpperCase();
     const ca = String(localResult[item.id]?.correctAnswer || item.correctAnswer || "").toUpperCase();
     if (rec.isCorrect && ua === key) cls.push("is-correct");
@@ -519,7 +558,7 @@ const submit = async (item) => {
         };
         row.correctAnswer = ca;
       }
-      if (!isRandomDeck.value) {
+      if (!isRandomDeck.value && !isDailyDeck.value) {
         await loadSummary();
       }
       questionPageEnteredAt[qid] = Date.now();
@@ -587,6 +626,19 @@ watch(
   async () => {
     await loadSummary();
     await loadDeck();
+  }
+);
+
+watch(
+  () => route.query.qid,
+  () => {
+    if (!deck.value.length) return;
+    if (targetQid.value == null) return;
+    const idx = deck.value.findIndex((x) => Number(x.id) === targetQid.value);
+    if (idx >= 0) {
+      currentIndex.value = idx;
+      markCurrentQuestionPageEntered();
+    }
   }
 );
 
@@ -681,6 +733,19 @@ onBeforeUnmount(() => {
   margin-bottom: 10px;
   font-size: 13px;
   line-height: 1.45;
+}
+.history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.history-detail {
+  margin-top: 6px;
+}
+.history-toggle-btn {
+  padding: 0;
+  min-height: auto;
 }
 .history-banner.ok {
   background: #ecfdf5;

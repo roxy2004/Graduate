@@ -31,9 +31,10 @@
       </template>
       <p>继续保持练习节奏，建议优先复习近期错题并完成每日 10 题训练。</p>
       <div class="action-row">
-        <el-button type="primary" @click="router.push('/manager/student/learning')">去专项学习</el-button>
-        <el-button type="success" @click="router.push('/manager/student/practice')">去练习中心</el-button>
-        <el-button type="warning" @click="router.push('/manager/student/mistakes')">查看错题本</el-button>
+        <el-button type="primary" plain @click="router.push('/manager/student/learning')">去专项学习</el-button>
+        <el-button type="primary" plain @click="router.push('/manager/student/practice/daily')">去做每日训练</el-button>
+        <el-button type="primary" plain @click="router.push('/manager/student/practice')">去练习中心</el-button>
+        <el-button type="primary" plain @click="router.push('/manager/student/mistakes')">查看错题本</el-button>
       </div>
     </el-card>
 

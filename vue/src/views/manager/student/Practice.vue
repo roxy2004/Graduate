@@ -3,13 +3,29 @@
     <header class="practice-header">
       <div class="practice-header-text">
         <h2 class="page-title">练习中心</h2>
-        <p class="page-desc">按知识点卡片刷题；未做过的题目优先。也可一键随机 10 题，题目可来自不同知识点。</p>
+        <p class="page-desc">按知识点卡片刷题；未做过的题目优先。也可一键进入每日推荐 10 题或随机 10 题练习。</p>
       </div>
-      <el-button type="primary" plain class="refresh-btn" @click="loadList">刷新列表</el-button>
+      <el-button type="primary" plain class="refresh-btn" @click="refreshAll">刷新列表</el-button>
     </header>
 
     <div v-if="loading" class="placeholder">加载中…</div>
     <template v-else>
+      <section
+        v-if="hasAnyQuestions"
+        class="random-strip daily-strip"
+        role="button"
+        tabindex="0"
+        @click="goDailyTen"
+        @keydown.enter.prevent="goDailyTen"
+      >
+        <div class="random-strip-icon daily-icon" aria-hidden="true">DAY</div>
+        <div class="random-strip-body">
+          <div class="random-strip-title">每日推荐 10 题</div>
+          <div class="random-strip-desc">固定每日推荐题单，做完会标记“今日已做”。当前进度：{{ dailyDoneCount }}/{{ dailyTotalCount }}。</div>
+        </div>
+        <el-button type="primary" class="random-strip-cta" @click.stop="goDailyTen">开始</el-button>
+      </section>
+
       <section
         v-if="hasAnyQuestions"
         class="random-strip"
@@ -59,6 +75,8 @@ import request from "@/utils/request";
 const router = useRouter();
 const list = ref([]);
 const loading = ref(false);
+const dailyDoneCount = ref(0);
+const dailyTotalCount = ref(10);
 
 const rowKey = (row) => row.id ?? row.ID;
 const num = (v) => {
@@ -91,6 +109,30 @@ const loadList = async () => {
   }
 };
 
+const loadDailyProgress = async () => {
+  try {
+    const resp = await request.get("/xwd/student/practice/daily-deck?limit=10");
+    if (resp?.status === "success") {
+      const rows = resp.data || [];
+      dailyTotalCount.value = rows.length || 10;
+      dailyDoneCount.value = rows.filter((r) => {
+        const v = r?.doneToday;
+        return v === true || v === 1 || String(v).toLowerCase() === "true";
+      }).length;
+    } else {
+      dailyDoneCount.value = 0;
+      dailyTotalCount.value = 10;
+    }
+  } catch (e) {
+    dailyDoneCount.value = 0;
+    dailyTotalCount.value = 10;
+  }
+};
+
+const refreshAll = async () => {
+  await Promise.all([loadList(), loadDailyProgress()]);
+};
+
 const goPractice = (row) => {
   const id = row.id ?? row.ID;
   if (id == null) return;
@@ -105,8 +147,16 @@ const goRandomTen = () => {
   router.push("/manager/student/practice/random");
 };
 
+const goDailyTen = () => {
+  if (!hasAnyQuestions.value) {
+    ElMessage.warning("当前没有可练习的题目");
+    return;
+  }
+  router.push("/manager/student/practice/daily");
+};
+
 onMounted(() => {
-  loadList();
+  refreshAll();
 });
 </script>
 
@@ -168,6 +218,22 @@ onMounted(() => {
   background: linear-gradient(110deg, #eef2ff 0%, #e0f2fe 42%, #f8fafc 100%);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 12px 32px rgba(37, 99, 235, 0.12);
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.daily-strip {
+  border-color: #99f6e4;
+  background: linear-gradient(110deg, #ecfeff 0%, #e0f2fe 42%, #f8fafc 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 12px 32px rgba(13, 148, 136, 0.12);
+}
+.daily-strip:hover {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 16px 40px rgba(13, 148, 136, 0.16);
+  border-color: #5eead4;
+}
+.daily-icon {
+  color: #0f766e;
+  background: linear-gradient(145deg, #fff 0%, #ccfbf1 100%);
+  border-color: #99f6e4;
+  font-size: 14px;
+  letter-spacing: 0.03em;
 }
 .random-strip:hover {
   transform: translateY(-1px);

@@ -123,4 +123,14 @@ public interface LearningRecordDao {
                          @Param("userId") Long userId,
                          @Param("userAnswer") String userAnswer,
                          @Param("isCorrect") Integer isCorrect);
+
+    @Select("SELECT COUNT(1) FROM learning_record " +
+            "WHERE user_id = #{userId} AND question_id = #{questionId} " +
+            "AND DATE(answered_at) = CURDATE()")
+    int countTodayAttemptsByUserAndQuestion(@Param("userId") Long userId, @Param("questionId") Long questionId);
+
+    @Select("SELECT user_answer AS userAnswer, is_correct AS isCorrect, answered_at AS answeredAt, time_spent AS timeSpent " +
+            "FROM learning_record WHERE user_id = #{userId} AND question_id = #{questionId} " +
+            "ORDER BY answered_at DESC, id DESC LIMIT 1")
+    Map<String, Object> selectLatestAttemptByUserAndQuestion(@Param("userId") Long userId, @Param("questionId") Long questionId);
 }

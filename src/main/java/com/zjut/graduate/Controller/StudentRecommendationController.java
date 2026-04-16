@@ -17,11 +17,12 @@ public class StudentRecommendationController {
     private LearningRouteService learningRouteService;
 
     @GetMapping("/latest")
-    public Map<String, Object> latest(HttpSession session) {
+    public Map<String, Object> latest(@RequestParam(value = "includeAi", defaultValue = "true") boolean includeAi,
+                                      HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
         if (authError != null) return authError;
         Long userId = (Long) session.getAttribute("userId");
-        Map<String, Object> data = learningRouteService.getLatestRoute(userId);
+        Map<String, Object> data = learningRouteService.getLatestRoute(userId, includeAi);
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
         response.put("data", data);

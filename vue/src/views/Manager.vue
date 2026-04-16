@@ -2,7 +2,14 @@
   <div class="manager-layout">
     <div class="manager-header page-shell">
       <div class="header-left">
-        <span class="title">&gt;_ Learning System</span>
+        <div class="user-chip clickable-chip" @click="goStudentAccount">
+          <img v-if="avatarSrc" :src="avatarSrc" alt="avatar" class="avatar-img" />
+          <div v-else class="avatar-fallback">{{ avatarText }}</div>
+          <div class="user-meta">
+            <div class="user-level">{{ userLevel }}</div>
+            <div class="user-name">{{ user?.username || "未命名" }}</div>
+          </div>
+        </div>
         <el-button v-if="user?.role === 'teacher'" text @click="goTeacherUsers">学生管理</el-button>
         <el-button v-if="user?.role === 'teacher'" text @click="goTeacherQuestions">题目管理</el-button>
         <el-button v-if="user?.role === 'teacher'" text @click="goTeacherChapters">章节资料</el-button>
@@ -15,7 +22,6 @@
         <el-button v-if="user?.role === 'student'" text @click="goStudentAccount">个人中心</el-button>
       </div>
       <div class="header-right">
-        <span class="user-name">{{ user?.username }} ({{ user?.role }})</span>
         <el-button text @click="logout">退出</el-button>
       </div>
     </div>
@@ -34,6 +40,21 @@ import StudentDeepSeekChat from "@/components/StudentDeepSeekChat.vue";
 
 const router = useRouter();
 const user = computed(() => JSON.parse(localStorage.getItem("user") || "null"));
+const userLevel = computed(() => {
+  const lv = user.value?.level || user.value?.learningLevel || "L2";
+  return `等级 ${lv}`;
+});
+const avatarText = computed(() => {
+  const name = (user.value?.username || "ST").toString().trim();
+  if (!name) return "ST";
+  return (name.slice(0, 2)).toUpperCase();
+});
+const avatarSrc = computed(() => {
+  const raw = (user.value?.avatarUrl || "").toString().trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `http://localhost:8080${raw.startsWith("/") ? raw : `/${raw}`}`;
+});
 
 const goTeacherUsers = async () => {
   await router.push("/manager/teacher/users");
@@ -109,15 +130,59 @@ const logout = async () => {
   gap: 10px;
 }
 
-.title {
-  font-size: 17px;
+.user-name {
+  font-size: 13px;
+  color: #334155;
   font-weight: 600;
-  margin-right: 8px;
-  color: #2563eb;
 }
 
-.user-name {
-  font-size: 14px;
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+
+.clickable-chip {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.clickable-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.14);
+}
+
+.avatar-img,
+.avatar-fallback {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #e0e7ff;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.user-level {
+  font-size: 11px;
   color: #64748b;
 }
 

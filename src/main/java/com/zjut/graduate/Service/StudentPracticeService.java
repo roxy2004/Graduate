@@ -21,6 +21,11 @@ public interface StudentPracticeService {
      */
     List<Map<String, Object>> getRandomCrossKpPracticeDeck(Long userId, int limit);
 
+    /**
+     * 每日推荐固定题单（默认 10 题），来自推荐快照，包含题目选项与最近作答信息。
+     */
+    List<Map<String, Object>> getDailyRecommendedDeck(Long userId, int limit);
+
     Map<String, Object> submitAttempt(Long userId, Long kpId, Long questionId, String userAnswer, Integer timeSpent);
 
     void clearPracticeRecords(Long userId, Long kpId);

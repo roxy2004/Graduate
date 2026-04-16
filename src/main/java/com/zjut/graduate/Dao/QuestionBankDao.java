@@ -126,4 +126,19 @@ public interface QuestionBankDao {
             "ORDER BY RAND() " +
             "LIMIT #{limit}")
     List<Map<String, Object>> selectRandomCrossKpPracticeDeckRows(@Param("userId") Long userId, @Param("limit") int limit);
+
+    /**
+     * 每日推荐候选题：指定知识点下，未做过优先，再按最近作答时间升序；用于个性化组卷。
+     */
+    @Select("SELECT qb.id, qb.content, qb.question_type AS questionType, qb.options, qb.difficulty, qb.source_tag AS sourceTag, " +
+            "  (SELECT MIN(rel2.kp_id) FROM question_knowledge_point_rel rel2 WHERE rel2.question_id = qb.id) AS knowledgePointId, " +
+            "  (SELECT MAX(lr.answered_at) FROM learning_record lr WHERE lr.user_id = #{userId} AND lr.question_id = qb.id) AS lastAnsweredAt, " +
+            "  (SELECT COUNT(*) FROM learning_record lr WHERE lr.user_id = #{userId} AND lr.question_id = qb.id) AS attemptedCount, " +
+            "  (SELECT COUNT(*) FROM learning_record lr WHERE lr.user_id = #{userId} AND lr.question_id = qb.id AND lr.is_correct = 0) AS wrongCount " +
+            "FROM question_bank qb " +
+            "INNER JOIN question_knowledge_point_rel rel ON rel.question_id = qb.id AND rel.kp_id = #{kpId} " +
+            "WHERE qb.status = 1 " +
+            "ORDER BY qb.id ASC " +
+            "LIMIT #{limit}")
+    List<Map<String, Object>> selectDailyCandidatesByKp(@Param("userId") Long userId, @Param("kpId") Long kpId, @Param("limit") int limit);
 }

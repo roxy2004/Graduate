@@ -40,6 +40,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public User getById(Long userId) {
+        return userDao.selectById(userId);
+    }
+
+    @Override
     public List<User> listStudents() {
         return userDao.selectByRole("student");
     }
@@ -62,6 +67,30 @@ public class UserServiceImpl implements UserService {
     public boolean resetPassword(Long userId, String rawPassword) {
         String encodedPassword = passwordEncoder.encode(rawPassword);
         return userDao.updatePasswordById(userId, encodedPassword) > 0;
+    }
+
+    @Override
+    public boolean changePassword(Long userId, String oldRawPassword, String newRawPassword) {
+        User user = userDao.selectById(userId);
+        if (user == null || user.getPassword() == null) {
+            return false;
+        }
+        String storedPassword = user.getPassword();
+        boolean matched;
+        if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$") || storedPassword.startsWith("$2y$")) {
+            matched = passwordEncoder.matches(oldRawPassword, storedPassword);
+        } else {
+            matched = storedPassword.equals(oldRawPassword);
+        }
+        if (!matched) {
+            return false;
+        }
+        return userDao.updatePasswordById(userId, passwordEncoder.encode(newRawPassword)) > 0;
+    }
+
+    @Override
+    public boolean updateAvatar(Long userId, String avatarUrl) {
+        return userDao.updateAvatarById(userId, avatarUrl) > 0;
     }
 
     @Override

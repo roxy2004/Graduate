@@ -22,7 +22,8 @@ public class StudentHomeServiceImpl implements StudentHomeService {
     public Map<String, Object> getOverview(Long userId) {
         Map<String, Object> response = new HashMap<>();
         response.put("stats", studentDashboardService.getDashboardStats(userId));
-        response.put("recommendation", learningRouteService.getLatestRoute(userId));
+        // 首页走轻量推荐，避免登录后首屏被 AI 调用阻塞。
+        response.put("recommendation", learningRouteService.getLatestRoute(userId, false));
         return response;
     }
 }

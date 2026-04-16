@@ -9,6 +9,7 @@ import com.zjut.graduate.Po.KnowledgePoint;
 import com.zjut.graduate.Po.LearnerKnowledgeState;
 import com.zjut.graduate.Po.LearningRecord;
 import com.zjut.graduate.Po.QuestionBank;
+import com.zjut.graduate.Service.LearningRouteService;
 import com.zjut.graduate.Service.MistakeDeepAnalysisService;
 import com.zjut.graduate.Service.StudentPracticeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +45,9 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
 
     @Autowired
     private MistakeDeepAnalysisService mistakeDeepAnalysisService;
+
+    @Autowired
+    private LearningRouteService learningRouteService;
 
     @Override
     public List<Map<String, Object>> listKnowledgePointPracticeSummary(Long userId) {
@@ -180,6 +184,81 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
             out.add(item);
         }
         return out;
+    }
+
+    @Override
+    public List<Map<String, Object>> getDailyRecommendedDeck(Long userId, int limit) {
+        int n = Math.max(1, Math.min(limit, 50));
+        Map<String, Object> payload = learningRouteService.getLatestRoute(userId, false);
+        Object raw = payload == null ? null : payload.get("dailyQuestions");
+        if (!(raw instanceof List)) {
+            return java.util.Collections.emptyList();
+        }
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> daily = (List<Map<String, Object>>) raw;
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : daily) {
+            if (out.size() >= n) break;
+            Long qid = null;
+            Object qraw = row.get("questionId");
+            if (qraw instanceof Number) {
+                qid = ((Number) qraw).longValue();
+            } else if (qraw != null) {
+                try {
+                    qid = Long.parseLong(String.valueOf(qraw).trim());
+                } catch (NumberFormatException ignore) {
+                    qid = null;
+                }
+            }
+            if (qid == null) continue;
+            QuestionBank qb = questionBankDao.selectById(qid);
+            if (qb == null || qb.getStatus() == null || qb.getStatus() != 1) continue;
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", qb.getId());
+            item.put("content", qb.getContent());
+            item.put("questionType", qb.getQuestionType());
+            item.put("options", qb.getOptions());
+            item.put("difficulty", qb.getDifficulty());
+            item.put("sourceTag", qb.getSourceTag());
+            item.put("knowledgePointId", row.get("knowledgePointId"));
+            item.put("knowledgePointName", row.get("knowledgePointName"));
+            item.put("doneToday", toBool(row.get("doneToday")));
+            Map<String, Object> last = learningRecordDao.selectLatestAttemptByUserAndQuestion(userId, qid);
+            if (last != null && last.get("userAnswer") != null && !String.valueOf(last.get("userAnswer")).trim().isEmpty()) {
+                Map<String, Object> la = new LinkedHashMap<>();
+                la.put("userAnswer", String.valueOf(last.get("userAnswer")).trim().toUpperCase());
+                Object lic = last.get("isCorrect");
+                boolean ok = false;
+                if (lic instanceof Number) {
+                    ok = ((Number) lic).intValue() == 1;
+                } else if (lic instanceof Boolean) {
+                    ok = (Boolean) lic;
+                }
+                la.put("isCorrect", ok);
+                la.put("answeredAt", last.get("answeredAt"));
+                Object lts = last.get("timeSpent");
+                Integer priorSec = null;
+                if (lts instanceof Number) {
+                    priorSec = Math.max(0, ((Number) lts).intValue());
+                }
+                la.put("timeSpent", priorSec);
+                item.put("lastAttempt", la);
+                item.put("correctAnswer", qb.getCorrectAnswer() == null ? null : qb.getCorrectAnswer().trim().toUpperCase());
+            } else {
+                item.put("lastAttempt", null);
+                item.put("correctAnswer", null);
+            }
+            out.add(item);
+        }
+        return out;
+    }
+
+    private static boolean toBool(Object raw) {
+        if (raw instanceof Boolean) return (Boolean) raw;
+        if (raw instanceof Number) return ((Number) raw).intValue() != 0;
+        if (raw == null) return false;
+        String s = String.valueOf(raw).trim();
+        return "true".equalsIgnoreCase(s) || "1".equals(s);
     }
 
     private static Object col(Map<String, Object> row, String key) {
