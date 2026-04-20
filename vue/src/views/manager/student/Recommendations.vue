@@ -45,6 +45,39 @@
       <div class="ai-sub">{{ activeAiInsights.predictionComment }}</div>
     </section>
 
+    <section v-if="route || items.length" class="route-section">
+      <div class="route-section-head">
+        <h3>个性化学习路线</h3>
+        <span class="route-badge">按序练习</span>
+      </div>
+      <p v-if="route" class="route-lead">{{ route.summary || route.title || "按以下步骤完成今日推荐。" }}</p>
+      <div v-if="items.length" class="route-steps">
+        <article
+          v-for="item in items"
+          :key="item.id || `${item.sortNo}-${item.itemId}`"
+          class="route-step"
+          :class="{ done: Number(item.completed) === 1 }"
+        >
+          <div class="step-index">
+            <span v-if="Number(item.completed) === 1" class="step-check">✓</span>
+            <span v-else class="step-num">{{ item.sortNo }}</span>
+          </div>
+          <div class="step-body">
+            <div class="step-title-row">
+              <span class="step-title">{{ item.kpName || `知识点 #${item.itemId}` }}</span>
+              <span v-if="item.estimatedMinutes" class="step-meta">约 {{ item.estimatedMinutes }} 分钟</span>
+            </div>
+            <p class="step-reason">{{ item.reason }}</p>
+            <div v-if="item.masteryPercent != null" class="step-chips">
+              <span class="s-chip">掌握度 {{ num(item.masteryPercent) }}%</span>
+              <span v-if="item.accuracyPercent != null" class="s-chip">正确率 {{ num(item.accuracyPercent) }}%</span>
+            </div>
+            <el-button v-if="item.actionPath" type="primary" plain size="small" @click="goAction(item)">去练习</el-button>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <div v-if="activePersonalized.length === 0" class="placeholder">暂无可生成的推荐，请先完成几次练习。</div>
     <section v-else class="rec-list">
       <article v-for="(it, idx) in activePersonalized" :key="it.kpId || idx" class="rec-card">
@@ -86,17 +119,6 @@
           <el-button type="primary" text @click="goAction(q)">去做这题</el-button>
         </article>
       </div>
-    </section>
-
-    <section v-if="route || items.length" class="legacy-box">
-      <div class="legacy-title">历史推荐路线</div>
-      <p v-if="route" class="legacy-summary">{{ route.title }} · {{ route.summary || "按顺序完成推荐任务。" }}</p>
-      <ul class="item-list">
-        <li v-for="item in items" :key="item.id">
-          <span class="type">{{ item.itemType }}</span>
-          <span>{{ item.reason || `任务 #${item.itemId}` }}</span>
-        </li>
-      </ul>
     </section>
   </div>
 </template>
@@ -186,6 +208,8 @@ const loadRecommendation = async () => {
     if (aiResp?.status === "success") {
       const data = aiResp?.data || {};
       aiPayload.value = data;
+      if (data.route) route.value = data.route;
+      if (Array.isArray(data.items)) items.value = data.items;
       if (viewMode.value === "ai" && !hasAiData.value) {
         viewMode.value = "rule";
       }
@@ -336,41 +360,132 @@ loadRecommendation();
   color: #64748b;
 }
 
-.item-list {
-  margin: 10px 0 0;
-  padding-left: 18px;
+.route-section {
+  margin-top: 22px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid #c7d2fe;
+  background: linear-gradient(180deg, #f5f7ff 0%, #ffffff 48%);
 }
 
-.item-list li {
-  margin: 4px 0;
-  color: #334155;
+.route-section-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.type {
-  display: inline-block;
-  margin-right: 8px;
-  color: #64748b;
-  font-size: 12px;
+.route-section-head h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #1e1b4b;
 }
 
-.legacy-box {
-  margin-top: 18px;
-  padding: 14px;
-  border-radius: 10px;
-  border: 1px dashed #cbd5e1;
-  background: #f8fafc;
-}
-
-.legacy-title {
-  font-size: 13px;
+.route-badge {
+  font-size: 11px;
   font-weight: 700;
-  color: #334155;
+  color: #4338ca;
+  background: #e0e7ff;
+  border-radius: 999px;
+  padding: 3px 10px;
 }
 
-.legacy-summary {
-  margin: 6px 0 0;
+.route-lead {
+  margin: 10px 0 0;
   font-size: 13px;
   color: #475569;
+  line-height: 1.5;
+}
+
+.route-steps {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.route-step {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.route-step.done {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.step-index {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: #4338ca;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.route-step.done .step-index {
+  background: #22c55e;
+  color: #fff;
+}
+
+.step-check {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.step-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.step-meta {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.step-reason {
+  margin: 0;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.45;
+}
+
+.step-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.s-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
 }
 
 .daily-box {

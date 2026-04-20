@@ -16,6 +16,7 @@ import com.zjut.graduate.Po.LearningRoute;
 import com.zjut.graduate.Po.LearningRouteItem;
 import com.zjut.graduate.Po.QuestionBank;
 import com.zjut.graduate.Service.DeepSeekProxyService;
+import com.zjut.graduate.Service.LearningRouteMaintenanceService;
 import com.zjut.graduate.Service.LearningRouteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -34,12 +35,15 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 public class LearningRouteServiceImpl implements LearningRouteService {
-    private static final String MODE_RULE = "rule_v3";
-    private static final String MODE_AI = "ai_v3";
+    private static final String MODE_RULE = "rule_v4";
+    private static final String MODE_AI = "ai_v4";
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Autowired
     private LearningRouteDao learningRouteDao;
+
+    @Autowired
+    private LearningRouteMaintenanceService learningRouteMaintenanceService;
 
     @Autowired
     private LearnerKnowledgeStateDao learnerKnowledgeStateDao;
@@ -93,23 +97,16 @@ public class LearningRouteServiceImpl implements LearningRouteService {
 
     private Map<String, Object> buildLatestRoutePayload(Long userId, boolean includeAi, Map<String, Object> baseRulePayload) {
         Map<String, Object> data = new HashMap<>();
-        LearningRoute route = learningRouteDao.selectLatestByUserId(userId);
-        if (route == null) {
-            data.put("route", null);
-            data.put("items", new ArrayList<LearningRouteItem>());
-        } else {
-            List<LearningRouteItem> items = learningRouteDao.selectItemsByRouteId(route.getId());
-            data.put("route", route);
-            data.put("items", items);
-        }
 
         List<Map<String, Object>> personalized;
         List<Map<String, Object>> daily;
+        boolean needRouteSync = false;
         if (baseRulePayload != null) {
             personalized = castMapList(baseRulePayload.get("personalized"));
             daily = castMapList(baseRulePayload.get("dailyQuestions"));
             if (personalized == null || personalized.isEmpty()) {
                 personalized = buildPersonalizedRecommendations(userId);
+                needRouteSync = true;
             }
             if (daily == null || daily.isEmpty()) {
                 daily = buildDailyQuestions(userId, personalized, 10, false);
@@ -117,7 +114,24 @@ public class LearningRouteServiceImpl implements LearningRouteService {
         } else {
             personalized = buildPersonalizedRecommendations(userId);
             daily = buildDailyQuestions(userId, personalized, 10, false);
+            needRouteSync = true;
         }
+        if (needRouteSync) {
+            learningRouteMaintenanceService.syncFromPersonalized(userId, personalized);
+        }
+
+        LearningRoute route = learningRouteDao.selectLatestByUserId(userId);
+        List<Map<String, Object>> itemViews;
+        if (route == null) {
+            data.put("route", null);
+            itemViews = new ArrayList<>();
+        } else {
+            List<LearningRouteItem> items = learningRouteDao.selectItemsByRouteId(route.getId());
+            data.put("route", route);
+            itemViews = enrichRouteItems(items, personalized, route);
+        }
+        data.put("items", itemViews);
+
         if (includeAi) {
             enrichDailyReasonsByAi(daily);
         }
@@ -126,6 +140,64 @@ public class LearningRouteServiceImpl implements LearningRouteService {
         data.put("prediction", buildPrediction(userId, personalized));
         data.put("aiInsights", includeAi ? buildAiInsights(personalized, daily, data.get("prediction")) : buildAiDisabledHint());
         return data;
+    }
+
+    private List<Map<String, Object>> enrichRouteItems(List<LearningRouteItem> items, List<Map<String, Object>> personalized,
+                                                       LearningRoute route) {
+        Map<Long, Map<String, Object>> byKp = new HashMap<>();
+        if (personalized != null) {
+            for (Map<String, Object> p : personalized) {
+                Long id = toLong(p.get("kpId"));
+                if (id != null) {
+                    byKp.put(id, p);
+                }
+            }
+        }
+        boolean ruleEngineRoute = route != null && route.getGeneratedBy() != null
+                && "rule_engine".equals(route.getGeneratedBy());
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (items == null) {
+            return out;
+        }
+        for (LearningRouteItem it : items) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", it.getId());
+            m.put("routeId", it.getRouteId());
+            m.put("itemType", it.getItemType());
+            m.put("itemId", it.getItemId());
+            m.put("reason", it.getReason());
+            m.put("priority", it.getPriority());
+            m.put("estimatedMinutes", it.getEstimatedMinutes());
+            m.put("sortNo", it.getSortNo());
+            m.put("completed", it.getCompleted());
+            Long kpId = it.getItemId();
+            Map<String, Object> p = kpId == null ? null : byKp.get(kpId);
+            if (kpId != null && p != null && ruleEngineRoute) {
+                m.put("kpName", p.get("kpName"));
+                m.put("masteryPercent", p.get("masteryPercent"));
+                m.put("accuracyPercent", p.get("accuracyPercent"));
+                m.put("remainingQuestions", p.get("remainingQuestions"));
+                m.put("actionPath", "/manager/student/practice/kp/" + kpId);
+            } else if (kpId != null && isKnowledgePointStepType(it.getItemType())) {
+                if (p != null) {
+                    m.put("kpName", p.get("kpName"));
+                    m.put("masteryPercent", p.get("masteryPercent"));
+                    m.put("accuracyPercent", p.get("accuracyPercent"));
+                    m.put("remainingQuestions", p.get("remainingQuestions"));
+                }
+                m.put("actionPath", "/manager/student/practice/kp/" + kpId);
+            }
+            out.add(m);
+        }
+        return out;
+    }
+
+    private static boolean isKnowledgePointStepType(String itemType) {
+        if (itemType == null) {
+            return false;
+        }
+        String t = itemType.trim();
+        return "KNOWLEDGE_POINT".equalsIgnoreCase(t) || "knowledge_point".equalsIgnoreCase(t);
     }
 
     private Map<String, Object> loadSnapshot(Long userId, String mode) {
@@ -166,7 +238,57 @@ public class LearningRouteServiceImpl implements LearningRouteService {
             markDoneToday(userId, daily);
             out.put("dailyQuestions", daily);
         }
+        attachRouteProgress(userId, out);
         return out;
+    }
+
+    /**
+     * 根据最新掌握度刷新路线步骤完成状态（仅影响返回数据，不写回 item 表）。
+     */
+    private void attachRouteProgress(Long userId, Map<String, Object> payload) {
+        Object rawItems = payload.get("items");
+        if (!(rawItems instanceof List)) {
+            return;
+        }
+        List<?> list = (List<?>) rawItems;
+        if (list.isEmpty()) {
+            return;
+        }
+        List<LearnerKnowledgeState> states = learnerKnowledgeStateDao.selectByUserId(userId);
+        Map<Long, Double> masteryByKp = new HashMap<>();
+        for (LearnerKnowledgeState st : states) {
+            if (st != null && st.getKpId() != null && st.getMasteryLevel() != null) {
+                masteryByKp.put(st.getKpId(), clamp01(st.getMasteryLevel()));
+            }
+        }
+        boolean ruleEngineRoute = false;
+        Object routeObj = payload.get("route");
+        if (routeObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> rm = (Map<String, Object>) routeObj;
+            Object gb = rm.get("generatedBy");
+            ruleEngineRoute = "rule_engine".equals(String.valueOf(gb));
+        }
+        for (Object o : list) {
+            if (!(o instanceof Map)) {
+                continue;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> m = (Map<String, Object>) o;
+            String type = m.get("itemType") == null ? "" : String.valueOf(m.get("itemType"));
+            if (!ruleEngineRoute && !isKnowledgePointStepType(type)) {
+                continue;
+            }
+            Long kpId = toLong(m.get("itemId"));
+            if (kpId == null) {
+                continue;
+            }
+            Double mast = masteryByKp.get(kpId);
+            if (mast != null) {
+                m.put("masteryPercent", round1(mast * 100D));
+                m.put("completed", mast >= 0.75 ? 1 : 0);
+            }
+        }
     }
 
     private Map<String, Object> deepCopy(Map<String, Object> payload) {

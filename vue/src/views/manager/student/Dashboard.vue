@@ -42,16 +42,33 @@
       <template #header>
         <span>学习路线推荐</span>
       </template>
-      <div v-if="!latestRoute" class="empty-tip">暂无推荐路线，系统将基于学习数据自动生成。</div>
+      <div v-if="!latestRoute && routeItems.length === 0" class="empty-tip">暂无推荐路线，系统将基于学习数据自动生成。</div>
       <div v-else>
-        <div class="route-title">{{ latestRoute.title }}</div>
-        <p class="page-desc">{{ latestRoute.summary || "建议按以下步骤完成今日学习任务。" }}</p>
-        <ul class="route-list">
-          <li v-for="item in routeItems" :key="item.id">
-            <span class="item-type">{{ item.itemType }}</span>
-            <span>{{ item.reason || `任务 #${item.itemId}` }}</span>
-          </li>
-        </ul>
+        <div class="route-title">{{ latestRoute?.title || "个性化学习路线" }}</div>
+        <p class="page-desc">{{ latestRoute?.summary || "建议按以下步骤完成今日学习任务。" }}</p>
+        <div class="dash-route-steps">
+          <div
+            v-for="item in routeItems"
+            :key="item.id || `${item.sortNo}-${item.itemId}`"
+            class="dash-step"
+            :class="{ 'dash-step-done': Number(item.completed) === 1 }"
+          >
+            <span class="dash-step-no">{{ Number(item.completed) === 1 ? "✓" : item.sortNo }}</span>
+            <div class="dash-step-main">
+              <div class="dash-step-name">{{ item.kpName || `知识点 #${item.itemId}` }}</div>
+              <div class="dash-step-reason">{{ item.reason }}</div>
+            </div>
+            <el-button
+              v-if="item.actionPath"
+              type="primary"
+              plain
+              size="small"
+              @click="router.push(item.actionPath)"
+            >
+              练习
+            </el-button>
+          </div>
+        </div>
         <el-button type="primary" plain @click="router.push('/manager/student/recommendations')">查看完整推荐</el-button>
       </div>
     </el-card>
@@ -195,24 +212,63 @@ onMounted(() => {
   color: #1d4ed8;
 }
 
-.route-list {
-  margin: 8px 0 12px;
-  padding-left: 18px;
-  color: #334155;
+.dash-route-steps {
+  margin: 12px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.route-list li {
-  margin: 4px 0;
+.dash-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
 }
 
-.item-type {
-  display: inline-block;
-  margin-right: 8px;
-  color: #64748b;
+.dash-step-done {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.dash-step-no {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #eef2ff;
+  color: #4338ca;
   font-size: 12px;
-  border: 1px solid #c7d8f7;
-  border-radius: 999px;
-  padding: 1px 6px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-step-done .dash-step-no {
+  background: #22c55e;
+  color: #fff;
+}
+
+.dash-step-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dash-step-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.dash-step-reason {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
 }
 
 .empty-tip {
