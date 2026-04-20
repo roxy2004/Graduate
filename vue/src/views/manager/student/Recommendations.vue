@@ -91,6 +91,7 @@
           <span class="chip">掌握度 {{ num(it.masteryPercent) }}%</span>
           <span class="chip">正确率 {{ num(it.accuracyPercent) }}%</span>
           <span class="chip">置信度 {{ num(it.confidencePercent) }}%</span>
+          <span class="chip">时长达成 {{ num(it.timeRatioPercent) }}%</span>
           <span class="chip">已刷 {{ num(it.practicedCount) }}</span>
           <span class="chip">剩余 {{ num(it.remainingQuestions) }}</span>
         </div>

@@ -22,14 +22,11 @@ public interface CourseDao {
     @Select("SELECT s.id, s.chapter_id AS chapter_id, ch.sort_no AS chapter_sort_no, " +
             "s.title, 'video' AS section_type, " +
             "(s.estimated_minutes * 60) AS duration_seconds, s.sort_no, ch.title AS chapter_title, " +
-            "IFNULL(st.learned_seconds, 0) AS learned_seconds, IFNULL(nc.note_count, 0) AS note_count " +
+            "IFNULL(ulp.total_seconds, 0) AS learned_seconds, IFNULL(nc.note_count, 0) AS note_count " +
             "FROM course_section s " +
             "INNER JOIN course c ON s.course_id = c.id " +
             "INNER JOIN course_chapter ch ON ch.id = s.chapter_id AND ch.course_id = c.id " +
-            "LEFT JOIN (" +
-            "  SELECT section_id, IFNULL(SUM(duration_sec), 0) AS learned_seconds " +
-            "  FROM user_learning_session WHERE user_id = #{userId} GROUP BY section_id" +
-            ") st ON st.section_id = s.id " +
+            "LEFT JOIN user_learning_progress ulp ON ulp.user_id = #{userId} AND ulp.section_id = s.id " +
             "LEFT JOIN (" +
             "  SELECT section_id, COUNT(1) AS note_count " +
             "  FROM user_learning_note WHERE user_id = #{userId} GROUP BY section_id" +

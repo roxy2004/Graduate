@@ -75,6 +75,16 @@
                   <span class="dot">·</span>
                   笔记 {{ item.noteCount || 0 }} 条
                 </div>
+                <div class="progress-row">
+                  <span class="progress-label">完成率</span>
+                  <el-progress
+                    :percentage="sectionProgressPercent(item)"
+                    :stroke-width="8"
+                    :show-text="false"
+                    :status="sectionProgressStatus(item)"
+                  />
+                  <span class="progress-value">{{ sectionProgressPercent(item) }}%</span>
+                </div>
               </div>
               <div class="actions">
                 <el-button size="small" type="primary" plain @click="openResources(item, 'video')">视频</el-button>
@@ -253,6 +263,19 @@ const formatDuration = (totalSeconds) => {
   const h = Math.floor(m / 60);
   const mm = m % 60;
   return `${h}h${mm}m`;
+};
+
+const sectionProgressPercent = (section) => {
+  const learned = Math.max(0, Number(section?.learnedSeconds || 0));
+  const target = Math.max(1, Number(section?.durationSeconds || 0));
+  return Math.max(0, Math.min(100, Math.round((learned / target) * 100)));
+};
+
+const sectionProgressStatus = (section) => {
+  const p = sectionProgressPercent(section);
+  if (p < 40) return "exception";
+  if (p < 80) return "warning";
+  return "success";
 };
 
 const formatNoteTime = (raw) => {
@@ -900,6 +923,27 @@ loadCourses();
   margin-top: 6px;
   color: #64748b;
   font-size: 12px;
+}
+.progress-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.progress-label {
+  color: #64748b;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.progress-row :deep(.el-progress) {
+  flex: 1;
+}
+.progress-value {
+  min-width: 40px;
+  text-align: right;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
 }
 .placeholder {
   margin-top: 14px;

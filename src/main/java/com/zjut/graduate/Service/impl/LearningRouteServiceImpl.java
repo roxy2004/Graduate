@@ -76,7 +76,7 @@ public class LearningRouteServiceImpl implements LearningRouteService {
         String mode = includeAi ? MODE_AI : MODE_RULE;
         Map<String, Object> cached = loadSnapshot(userId, mode);
         if (cached != null) {
-            return attachTodayStatus(userId, cached);
+            return attachTodayStatus(userId, cached, includeAi);
         }
         if (includeAi) {
             // 先确保规则快照存在，保证同一天题单一致。
@@ -88,11 +88,11 @@ public class LearningRouteServiceImpl implements LearningRouteService {
             }
             Map<String, Object> aiPayload = buildLatestRoutePayload(userId, true, baseRule);
             saveSnapshot(userId, MODE_AI, aiPayload);
-            return attachTodayStatus(userId, aiPayload);
+            return attachTodayStatus(userId, aiPayload, true);
         }
         Map<String, Object> generated = buildLatestRoutePayload(userId, false, null);
         saveSnapshot(userId, MODE_RULE, generated);
-        return attachTodayStatus(userId, generated);
+        return attachTodayStatus(userId, generated, false);
     }
 
     private Map<String, Object> buildLatestRoutePayload(Long userId, boolean includeAi, Map<String, Object> baseRulePayload) {
@@ -231,15 +231,51 @@ public class LearningRouteServiceImpl implements LearningRouteService {
         }
     }
 
-    private Map<String, Object> attachTodayStatus(Long userId, Map<String, Object> payload) {
+    private Map<String, Object> attachTodayStatus(Long userId, Map<String, Object> payload, boolean includeAi) {
         Map<String, Object> out = deepCopy(payload);
         List<Map<String, Object>> daily = castMapList(out.get("dailyQuestions"));
         if (daily != null) {
             markDoneToday(userId, daily);
             out.put("dailyQuestions", daily);
         }
+        refreshRealtimePanels(userId, out, includeAi, daily);
         attachRouteProgress(userId, out);
         return out;
+    }
+
+    /**
+     * 每日题单来自快照（保证当天固定），其余面板实时刷新：
+     * - personalized（知识点优先级）
+     * - prediction（当前正确率/预测正确率）
+     * - route/items（基于实时 personalized 同步与回读）
+     */
+    private void refreshRealtimePanels(Long userId,
+                                       Map<String, Object> payload,
+                                       boolean includeAi,
+                                       List<Map<String, Object>> daily) {
+        List<Map<String, Object>> personalized = buildPersonalizedRecommendations(userId);
+        payload.put("personalized", personalized);
+        payload.put("prediction", buildPrediction(userId, personalized));
+
+        learningRouteMaintenanceService.syncFromPersonalized(userId, personalized);
+        LearningRoute route = learningRouteDao.selectLatestByUserId(userId);
+        if (route == null) {
+            payload.put("route", null);
+            payload.put("items", new ArrayList<>());
+        } else {
+            List<LearningRouteItem> items = learningRouteDao.selectItemsByRouteId(route.getId());
+            payload.put("route", route);
+            payload.put("items", enrichRouteItems(items, personalized, route));
+        }
+
+        if (!includeAi) {
+            payload.put("aiInsights", buildAiDisabledHint());
+            return;
+        }
+        Object rawAi = payload.get("aiInsights");
+        if (!(rawAi instanceof Map)) {
+            payload.put("aiInsights", buildAiInsights(personalized, daily == null ? new ArrayList<>() : daily, payload.get("prediction")));
+        }
     }
 
     /**
@@ -545,6 +581,7 @@ public class LearningRouteServiceImpl implements LearningRouteService {
         List<Map<String, Object>> practiceSummary = knowledgePointDao.selectPracticeSummaryByUser(userId);
         List<LearnerKnowledgeState> states = learnerKnowledgeStateDao.selectByUserId(userId);
         List<Map<String, Object>> kpStats = learningRecordDao.selectKnowledgePracticeStatsByUserId(userId);
+        List<Map<String, Object>> timeRatios = knowledgePointDao.selectLearningTimeRatiosByUser(userId);
 
         Map<Long, LearnerKnowledgeState> stateByKp = new HashMap<>();
         for (LearnerKnowledgeState st : states) {
@@ -559,6 +596,13 @@ public class LearningRouteServiceImpl implements LearningRouteService {
                 statsByKp.put(kpId, row);
             }
         }
+        Map<Long, Map<String, Object>> timeByKp = new HashMap<>();
+        for (Map<String, Object> row : timeRatios) {
+            Long kpId = toLong(row.get("kpId"));
+            if (kpId != null) {
+                timeByKp.put(kpId, row);
+            }
+        }
 
         List<Map<String, Object>> scored = new ArrayList<>();
         for (Map<String, Object> row : practiceSummary) {
@@ -571,18 +615,25 @@ public class LearningRouteServiceImpl implements LearningRouteService {
 
             LearnerKnowledgeState st = stateByKp.get(kpId);
             Map<String, Object> stat = statsByKp.get(kpId);
+            Map<String, Object> time = timeByKp.get(kpId);
+            int attempted = toInt(stat == null ? null : stat.get("practicedCount"));
             int correct = toInt(stat == null ? null : stat.get("correctCount"));
             double mastery = st == null || st.getMasteryLevel() == null ? fallbackMastery(practiced, correct) : clamp01(st.getMasteryLevel());
             double confidence = st == null || st.getConfidence() == null ? 0.55 : clamp01(st.getConfidence());
-            double accuracy = practiced <= 0 ? 0.5 : (double) correct / practiced;
+            // 口径统一为“作答次数正确率”；避免 distinct 题目数作分母导致 >100%。
+            double accuracy = attempted <= 0 ? 0.5 : clamp01((double) correct / attempted);
             double forgetting = recencyPenalty(st == null ? null : st.getLastPracticedAt());
             double novelty = practiced <= 2 ? 0.15 : practiced <= 5 ? 0.08 : 0.0;
+            double timeRatio = Math.max(0.0, Math.min(1.5, toDouble(time == null ? null : time.get("timeRatio"))));
+            // 只对“时长未达标”加压，达标后不再继续加压（避免刷时长影响推荐）。
+            double timeGap = Math.max(0.0, 1.0 - clamp01(timeRatio));
 
             double weakScore = (1.0 - mastery) * 0.45;
             double errorScore = (1.0 - accuracy) * 0.25;
             double confScore = (1.0 - confidence) * 0.18;
             double forgetScore = forgetting * 0.12;
-            double priority = clamp01(weakScore + errorScore + confScore + forgetScore + novelty);
+            double timeScore = timeGap * 0.10;
+            double priority = clamp01(weakScore + errorScore + confScore + forgetScore + novelty + timeScore);
 
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("kpId", kpId);
@@ -594,6 +645,8 @@ public class LearningRouteServiceImpl implements LearningRouteService {
             item.put("confidencePercent", round1(confidence * 100D));
             item.put("practicedCount", practiced);
             item.put("remainingQuestions", Math.max(0, total - practiced));
+            item.put("timeRatioPercent", round1(clamp01(timeRatio) * 100D));
+            item.put("timeGapPercent", round1(timeGap * 100D));
             item.put("reason", buildReason(mastery, accuracy, confidence, forgetting, practiced));
             item.put("actionType", "practice");
             item.put("actionPath", "/manager/student/practice/kp/" + kpId);

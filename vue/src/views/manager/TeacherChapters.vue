@@ -57,10 +57,28 @@
         <el-table-column prop="sortNo" label="排序" width="72" />
         <el-table-column prop="title" label="小节标题" min-width="160" show-overflow-tooltip />
         <el-table-column label="预估(分)" width="96">
-          <template #default="{ row }">{{ sectionMinutesDisplay(row) }}</template>
-        </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
+            <el-input-number
+              v-model="row.estimatedMinutes"
+              :min="1"
+              :max="600"
+              :controls="false"
+              size="small"
+              style="width: 84px"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="360" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :loading="sectionDurationSaving[row.id] === true"
+              @click="saveSectionDuration(row)"
+            >
+              存时长
+            </el-button>
             <el-button size="small" plain @click="openEditSection(row)">编辑</el-button>
             <el-button size="small" type="primary" plain @click="openSectionResources(row)">视频/文档</el-button>
             <el-button size="small" type="danger" plain @click="removeSection(row)">删除</el-button>
@@ -184,6 +202,7 @@ const sectionResources = ref([]);
 const secResLoading = ref(false);
 const secResAdding = ref(false);
 const secResForm = reactive({ resourceType: "doc", title: "", url: "" });
+const sectionDurationSaving = reactive({});
 
 const scopeLabel = (scope) => {
   if (scope === "section") return "小节";
@@ -506,6 +525,28 @@ const saveSection = async () => {
     }
   } finally {
     sectionSaving.value = false;
+  }
+};
+
+const saveSectionDuration = async (row) => {
+  const sectionId = row?.id;
+  if (!sectionId) return;
+  const estimatedMinutes = Math.max(1, Number(row.estimatedMinutes || 10));
+  sectionDurationSaving[sectionId] = true;
+  try {
+    const resp = await request.put(`/xwd/teacher/course-manage/sections/${sectionId}`, {
+      title: row.title || "",
+      sortNo: row.sortNo,
+      estimatedMinutes,
+    });
+    if (resp?.status === "success") {
+      row.estimatedMinutes = estimatedMinutes;
+      ElMessage.success("预估学习时间已更新");
+    } else {
+      ElMessage.error(resp?.message || "更新失败");
+    }
+  } finally {
+    sectionDurationSaving[sectionId] = false;
   }
 };
 

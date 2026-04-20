@@ -458,6 +458,74 @@ public class StudentPracticeServiceImpl implements StudentPracticeService {
         }
         learningRecordDao.deleteMistakeAnalysisByUserAndKp(userId, kpId);
         learningRecordDao.deleteLearningRecordsByUserAndKp(userId, kpId);
+        // 删除记录后按剩余数据回退/重算画像，而不是直接清空。
+        recalculateKnowledgeStateAfterRecordReset(userId, kpId);
+    }
+
+    /**
+     * 清空知识点练习记录后的画像处理：
+     * - 若该知识点仍有历史记录（兼容未来“部分删除”场景），按剩余统计重算；
+     * - 若无记录，回退到冷启动基线（0.50）。
+     */
+    private void recalculateKnowledgeStateAfterRecordReset(Long userId, Long kpId) {
+        List<Map<String, Object>> rows = learningRecordDao.selectKnowledgePracticeStatsByUserId(userId);
+        Map<String, Object> hit = null;
+        for (Map<String, Object> row : rows) {
+            Object raw = row.get("kpId");
+            if (raw instanceof Number && ((Number) raw).longValue() == kpId) {
+                hit = row;
+                break;
+            }
+        }
+
+        int practiced = hit == null ? 0 : toInt(hit.get("practicedCount"));
+        int correct = hit == null ? 0 : toInt(hit.get("correctCount"));
+        Date lastAt = hit == null ? null : toDate(hit.get("lastPracticedAt"));
+
+        double mastery;
+        double confidence;
+        if (practiced <= 0) {
+            mastery = 0.50;
+            confidence = 0.45;
+            lastAt = null;
+        } else {
+            double acc = clamp01((double) correct / practiced);
+            mastery = clamp01(0.35 + acc * 0.5); // 与推荐兜底口径一致
+            confidence = clamp(0.45 + 0.50 * Math.min(1.0, practiced / 40.0), 0.45, 0.95);
+        }
+
+        LearnerKnowledgeState state = learnerKnowledgeStateDao.selectByUserAndKp(userId, kpId);
+        Date now = new Date();
+        if (state == null) {
+            LearnerKnowledgeState created = new LearnerKnowledgeState();
+            created.setUserId(userId);
+            created.setKpId(kpId);
+            created.setMasteryLevel(round2(mastery));
+            created.setConfidence(round2(confidence));
+            created.setLastPracticedAt(lastAt);
+            created.setUpdatedAt(now);
+            learnerKnowledgeStateDao.insert(created);
+            return;
+        }
+        state.setMasteryLevel(round2(mastery));
+        state.setConfidence(round2(confidence));
+        state.setLastPracticedAt(lastAt);
+        state.setUpdatedAt(now);
+        learnerKnowledgeStateDao.updateMastery(state);
+    }
+
+    private static int toInt(Object raw) {
+        if (raw == null) return 0;
+        if (raw instanceof Number) return ((Number) raw).intValue();
+        try {
+            return Integer.parseInt(String.valueOf(raw).trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private static Date toDate(Object raw) {
+        return raw instanceof Date ? (Date) raw : null;
     }
 
     private Map<String, Object> toPublicQuestion(QuestionBank qb) {

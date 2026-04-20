@@ -36,4 +36,10 @@ public interface LearnerKnowledgeStateDao {
      */
     @Delete("DELETE FROM learner_knowledge_state WHERE user_id = #{userId}")
     int deleteByUserId(Long userId);
+
+    /**
+     * 删除某个用户在指定知识点的画像数据（清空该知识点练习记录时同步重置）。
+     */
+    @Delete("DELETE FROM learner_knowledge_state WHERE user_id = #{userId} AND kp_id = #{kpId}")
+    int deleteByUserAndKp(@Param("userId") Long userId, @Param("kpId") Long kpId);
 }
