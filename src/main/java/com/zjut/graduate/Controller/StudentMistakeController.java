@@ -11,12 +11,14 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生错题本 */
 @RequestMapping("/xwd/student/mistakes")
 public class StudentMistakeController {
 
     @Autowired
     private StudentMistakeService studentMistakeService;
 
+    /** 查询错题本列表 */
     @GetMapping
     public Map<String, Object> listMistakes(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -29,6 +31,7 @@ public class StudentMistakeController {
         return response;
     }
 
+    /** 错题重做并判分 */
     @PostMapping("/{recordId}/redo")
     public Map<String, Object> redo(@PathVariable("recordId") Long recordId,
                                     @RequestBody Map<String, String> payload,
@@ -43,6 +46,7 @@ public class StudentMistakeController {
         return studentMistakeService.redo(userId, recordId, answer);
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {
@@ -55,6 +59,7 @@ public class StudentMistakeController {
         return null;
     }
 
+    /** 构造错误响应 */
     private Map<String, Object> error(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");

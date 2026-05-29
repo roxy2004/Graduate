@@ -3,6 +3,7 @@ package com.zjut.graduate.Dao;
 import com.zjut.graduate.Po.LearningRecord;
 import org.apache.ibatis.annotations.*;
 
+import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -133,4 +134,43 @@ public interface LearningRecordDao {
             "FROM learning_record WHERE user_id = #{userId} AND question_id = #{questionId} " +
             "ORDER BY answered_at DESC, id DESC LIMIT 1")
     Map<String, Object> selectLatestAttemptByUserAndQuestion(@Param("userId") Long userId, @Param("questionId") Long questionId);
+
+    /**
+     * 按自然日汇总作答，用于个人中心正确率趋势。
+     */
+    @Select("SELECT DATE(lr.created_at) AS day, " +
+            "SUM(CASE WHEN lr.is_correct = 1 THEN 1 ELSE 0 END) AS correctCount, " +
+            "COUNT(*) AS totalCount " +
+            "FROM learning_record lr WHERE lr.user_id = #{userId} " +
+            "GROUP BY DATE(lr.created_at) ORDER BY day ASC")
+    List<Map<String, Object>> selectDailyAnswerBucketsByUserId(@Param("userId") Long userId);
+
+    /**
+     * 练习次数最多的知识点（用于折线图 Top N）。
+     */
+    @Select("SELECT qkr.kp_id AS kpId, COUNT(*) AS attemptCount " +
+            "FROM learning_record lr " +
+            "INNER JOIN question_knowledge_point_rel qkr ON qkr.question_id = lr.question_id " +
+            "WHERE lr.user_id = #{userId} " +
+            "GROUP BY qkr.kp_id ORDER BY attemptCount DESC LIMIT #{limit}")
+    List<Map<String, Object>> selectTopKnowledgePointsByAttemptVolume(@Param("userId") Long userId,
+                                                                      @Param("limit") int limit);
+
+    /**
+     * 指定知识点上的作答流水（按时间），用于计算累计正确率曲线。
+     */
+    @Select("<script>" +
+            "SELECT DATE(lr.created_at) AS day, lr.created_at AS createdAt, qkr.kp_id AS kpId, lr.is_correct AS isCorrect " +
+            "FROM learning_record lr " +
+            "INNER JOIN question_knowledge_point_rel qkr ON qkr.question_id = lr.question_id " +
+            "WHERE lr.user_id = #{userId} " +
+            "<if test='kpIds != null and kpIds.size() &gt; 0'>" +
+            " AND qkr.kp_id IN " +
+            "<foreach collection='kpIds' item='kid' open='(' separator=',' close=')'>" +
+            "#{kid}</foreach>" +
+            "</if>" +
+            " ORDER BY lr.created_at ASC, lr.id ASC" +
+            "</script>")
+    List<Map<String, Object>> selectKnowledgeAttemptTimeline(@Param("userId") Long userId,
+                                                             @Param("kpIds") Collection<Long> kpIds);
 }

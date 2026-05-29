@@ -11,11 +11,13 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 登录与登出接口 */
 @RequestMapping("/xwd")
 public class LoginController {
     @Autowired
     private UserService userService;
 
+    /** 用户登录，校验密码并写入 Session */
     @PostMapping("/login")
     public Map<String, Object> login(@RequestBody Map<String, String> loginData, HttpSession session) {
         String username = loginData.get("username");
@@ -37,6 +39,7 @@ public class LoginController {
         return response;
     }
 
+    /** 退出登录，销毁 Session */
     @PostMapping("/logout")
     public Map<String, Object> logout(HttpSession session) {
         Map<String, Object> response = new HashMap<>();
@@ -46,6 +49,7 @@ public class LoginController {
         return response;
     }
 
+    /** 脱敏用户信息，供前端展示 */
     private Map<String, Object> sanitizeUser(User user) {
         Map<String, Object> safeUser = new HashMap<>();
         safeUser.put("id", user.getId());

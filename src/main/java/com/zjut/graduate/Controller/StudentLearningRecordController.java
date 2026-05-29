@@ -11,12 +11,14 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生做题记录管理 */
 @RequestMapping("/xwd/student/records")
 public class StudentLearningRecordController {
 
     @Autowired
     private StudentLearningRecordService studentLearningRecordService;
 
+    /** 查询全部做题记录 */
     @GetMapping
     public Map<String, Object> listRecords(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -29,6 +31,7 @@ public class StudentLearningRecordController {
         return response;
     }
 
+    /** 删除单条做题记录 */
     @DeleteMapping("/{id}")
     public Map<String, Object> deleteRecord(@PathVariable("id") Long id, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -42,6 +45,7 @@ public class StudentLearningRecordController {
         return response;
     }
 
+    /** 清空全部做题记录 */
     @DeleteMapping
     public Map<String, Object> clearAll(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -55,6 +59,7 @@ public class StudentLearningRecordController {
         return response;
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {
@@ -67,6 +72,7 @@ public class StudentLearningRecordController {
         return null;
     }
 
+    /** 构造错误响应 */
     private Map<String, Object> error(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");

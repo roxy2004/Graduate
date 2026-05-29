@@ -13,12 +13,14 @@ import java.util.stream.Collectors;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 教师端学生账号管理 */
 @RequestMapping("/xwd/users")
 public class UserManageController {
 
     @Autowired
     private UserService userService;
 
+    /** 查询学生账号列表 */
     @GetMapping("/students")
     public Map<String, Object> listStudents(HttpSession session) {
         Map<String, Object> authError = requireTeacher(session);
@@ -35,6 +37,7 @@ public class UserManageController {
         return response;
     }
 
+    /** 创建学生账号 */
     @PostMapping("/students")
     public Map<String, Object> createStudent(@RequestBody Map<String, String> payload, HttpSession session) {
         Map<String, Object> authError = requireTeacher(session);
@@ -57,6 +60,7 @@ public class UserManageController {
         return response;
     }
 
+    /** 重置指定学生密码 */
     @PutMapping("/students/{id}/password")
     public Map<String, Object> resetStudentPassword(@PathVariable("id") Long id,
                                                     @RequestBody Map<String, String> payload,
@@ -79,6 +83,7 @@ public class UserManageController {
         return response;
     }
 
+    /** 删除指定学生账号 */
     @DeleteMapping("/students/{id}")
     public Map<String, Object> deleteStudent(@PathVariable("id") Long id, HttpSession session) {
         Map<String, Object> authError = requireTeacher(session);
@@ -95,6 +100,7 @@ public class UserManageController {
         return response;
     }
 
+    /** 校验当前 Session 是否为教师 */
     private Map<String, Object> requireTeacher(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"teacher".equals(role)) {
@@ -107,6 +113,7 @@ public class UserManageController {
         return null;
     }
 
+    /** 脱敏用户字段后返回 */
     private Map<String, Object> sanitizeUser(User user) {
         Map<String, Object> safeUser = new HashMap<>();
         safeUser.put("id", user.getId());
@@ -116,6 +123,7 @@ public class UserManageController {
         return safeUser;
     }
 
+    /** 构造统一错误响应 */
     private Map<String, Object> error(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
@@ -123,6 +131,7 @@ public class UserManageController {
         return response;
     }
 
+    /** 判断字符串是否为空 */
     private boolean isBlank(String value) {
         return value == null || value.trim().isEmpty();
     }

@@ -12,6 +12,7 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生练习与答题 */
 @RequestMapping("/xwd/student/practice")
 public class StudentPracticeController {
 
@@ -21,6 +22,7 @@ public class StudentPracticeController {
     @Autowired
     private PracticeWrongTutorService practiceWrongTutorService;
 
+    /** 知识点练习概览列表 */
     @GetMapping("/knowledge-points")
     public Map<String, Object> listKnowledgePoints(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -35,6 +37,7 @@ public class StudentPracticeController {
         return response;
     }
 
+    /** 单个知识点练习摘要 */
     @GetMapping("/knowledge-points/{kpId}/summary")
     public Map<String, Object> kpSummary(@PathVariable("kpId") Long kpId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -52,6 +55,7 @@ public class StudentPracticeController {
         return response;
     }
 
+    /** 跨知识点随机题单 */
     @GetMapping("/random-deck")
     public Map<String, Object> randomCrossKpDeck(@RequestParam(value = "limit", defaultValue = "10") int limit,
                                                  HttpSession session) {
@@ -68,6 +72,7 @@ public class StudentPracticeController {
         return response;
     }
 
+    /** 每日推荐题单 */
     @GetMapping("/daily-deck")
     public Map<String, Object> dailyDeck(@RequestParam(value = "limit", defaultValue = "10") int limit,
                                          HttpSession session) {
@@ -84,6 +89,7 @@ public class StudentPracticeController {
         return response;
     }
 
+    /** 指定知识点练习题单 */
     @GetMapping("/knowledge-points/{kpId}/deck")
     public Map<String, Object> practiceDeck(@PathVariable("kpId") Long kpId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -98,6 +104,7 @@ public class StudentPracticeController {
         return response;
     }
 
+    /** 获取知识点下一道题 */
     @GetMapping("/knowledge-points/{kpId}/next-question")
     public Map<String, Object> nextQuestion(@PathVariable("kpId") Long kpId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -119,6 +126,7 @@ public class StudentPracticeController {
         return response;
     }
 
+    /** 提交作答并记录结果 */
     @PostMapping("/knowledge-points/{kpId}/attempts")
     public Map<String, Object> submitAttempt(@PathVariable("kpId") Long kpId,
                                                @RequestBody Map<String, Object> body,
@@ -134,6 +142,7 @@ public class StudentPracticeController {
         return studentPracticeService.submitAttempt(userId, kpId, questionId, userAnswer, timeSpent);
     }
 
+    /** 错题 AI 讲解 */
     @PostMapping("/knowledge-points/{kpId}/wrong-tutor")
     public Map<String, Object> wrongTutor(@PathVariable("kpId") Long kpId,
                                           @RequestBody Map<String, Object> body,
@@ -148,6 +157,7 @@ public class StudentPracticeController {
         return practiceWrongTutorService.explainWrongAnswer(userId, kpId, questionId, userAnswer);
     }
 
+    /** 收藏 AI 辅导笔记到学习笔记 */
     @PostMapping("/knowledge-points/{kpId}/favorite-tutor-note")
     public Map<String, Object> favoriteTutorNote(@PathVariable("kpId") Long kpId,
                                                   @RequestBody Map<String, Object> body,
@@ -162,6 +172,7 @@ public class StudentPracticeController {
         return practiceWrongTutorService.favoriteTutorNote(userId, kpId, questionId, content);
     }
 
+    /** 清空某知识点下练习记录 */
     @DeleteMapping("/knowledge-points/{kpId}/records")
     public Map<String, Object> clearRecords(@PathVariable("kpId") Long kpId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -176,6 +187,7 @@ public class StudentPracticeController {
         return response;
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {
@@ -188,6 +200,7 @@ public class StudentPracticeController {
         return null;
     }
 
+    /** 构造错误响应 */
     private Map<String, Object> error(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
@@ -195,6 +208,7 @@ public class StudentPracticeController {
         return response;
     }
 
+    /** 请求体字段转 Long */
     private Long parseLong(Object raw) {
         if (raw == null) {
             return null;
@@ -209,6 +223,7 @@ public class StudentPracticeController {
         }
     }
 
+    /** 请求体字段转 Integer */
     private Integer parseInt(Object raw) {
         if (raw == null) {
             return null;

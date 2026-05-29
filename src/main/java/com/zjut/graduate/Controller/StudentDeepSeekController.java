@@ -11,12 +11,14 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生端 DeepSeek 对话代理 */
 @RequestMapping("/xwd/student/deepseek")
 public class StudentDeepSeekController {
 
     @Autowired
     private DeepSeekProxyService deepSeekProxyService;
 
+    /** 多轮对话，转发至 DeepSeek */
     @PostMapping("/chat")
     public Map<String, Object> chat(@RequestBody Map<String, Object> body, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -44,6 +46,7 @@ public class StudentDeepSeekController {
         }
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {
@@ -56,6 +59,7 @@ public class StudentDeepSeekController {
         return null;
     }
 
+    /** 构造错误响应 */
     private Map<String, Object> error(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");

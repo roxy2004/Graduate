@@ -7,7 +7,8 @@ graduate:
   # 学生端 DeepSeek 对话（OpenAI 兼容接口，与 spring-ai 块共用环境变量即可）
   deepseek:
     base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.deepseek.com}
-    api-key: ${SPRING_AI_OPENAI_API_KEY:sk-899d816989214d4282e2d8e792af6a43}
+    # 勿在仓库中写真实 Key；本地/部署通过环境变量 SPRING_AI_OPENAI_API_KEY 注入
+    api-key: ${SPRING_AI_OPENAI_API_KEY:sk-cfd560513da349f8a342f25d5179077e}
     model: ${SPRING_AI_OPENAI_MODEL:deepseek-chat}
 
 spring:
@@ -29,7 +30,7 @@ spring-ai:
   provider: openai-compatible
   openai:
     base-url: ${SPRING_AI_OPENAI_BASE_URL:https://api.deepseek.com}
-    api-key: ${SPRING_AI_OPENAI_API_KEY:sk-899d816989214d4282e2d8e792af6a43}
+    api-key: ${SPRING_AI_OPENAI_API_KEY:}
     chat:
       options:
         model: ${SPRING_AI_OPENAI_MODEL:deepseek-chat}

@@ -1,6 +1,7 @@
 package com.zjut.graduate.Controller;
 
 import com.zjut.graduate.Po.User;
+import com.zjut.graduate.Service.StudentLearningTrendService;
 import com.zjut.graduate.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
@@ -23,12 +24,17 @@ import java.util.UUID;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生个人中心（资料、密码、头像、趋势） */
 @RequestMapping("/xwd/student/account")
 public class StudentAccountController {
 
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private StudentLearningTrendService studentLearningTrendService;
+
+    /** 查询个人中心基本信息 */
     @GetMapping("/profile")
     public Map<String, Object> profile(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -50,6 +56,20 @@ public class StudentAccountController {
         return response;
     }
 
+    /** 查询学习趋势图表数据 */
+    @GetMapping("/learning-trends")
+    public Map<String, Object> learningTrends(HttpSession session) {
+        Map<String, Object> authError = requireStudent(session);
+        if (authError != null) return authError;
+        Long userId = (Long) session.getAttribute("userId");
+        Map<String, Object> data = studentLearningTrendService.buildTrendPayload(userId);
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("data", data);
+        return response;
+    }
+
+    /** 修改登录密码 */
     @PostMapping("/password")
     public Map<String, Object> changePassword(@RequestBody Map<String, String> body, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -70,6 +90,7 @@ public class StudentAccountController {
         return response;
     }
 
+    /** 上传并更新头像 */
     @PostMapping("/avatar")
     public Map<String, Object> uploadAvatar(@RequestParam("file") MultipartFile file, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -121,6 +142,7 @@ public class StudentAccountController {
         }
     }
 
+    /** 按文件名读取头像静态资源 */
     @GetMapping("/avatar/{fileName:.+}")
     public ResponseEntity<Resource> avatar(@PathVariable("fileName") String fileName) {
         if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
@@ -139,6 +161,7 @@ public class StudentAccountController {
         return ResponseEntity.ok().contentType(mt).body(new FileSystemResource(f));
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {
@@ -151,6 +174,7 @@ public class StudentAccountController {
         return null;
     }
 
+    /** 构造错误响应 */
     private Map<String, Object> error(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
@@ -158,10 +182,12 @@ public class StudentAccountController {
         return response;
     }
 
+    /** 判断字符串是否为空 */
     private static boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }
 
+    /** 用户名转安全文件名片段 */
     private static String sanitizeForFileName(String raw) {
         String s = raw == null ? "" : raw.trim();
         if (s.isEmpty()) {

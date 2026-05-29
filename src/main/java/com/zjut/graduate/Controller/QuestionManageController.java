@@ -14,12 +14,14 @@ import java.util.stream.Collectors;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 教师端题库管理 */
 @RequestMapping("/xwd/questions")
 public class QuestionManageController {
 
     @Autowired
     private QuestionBankService questionBankService;
 
+    /** 从 CSV 批量导入题目 */
     @PostMapping("/import")
     public Map<String, Object> importQuestions(@RequestParam("file") MultipartFile file, HttpSession session) {
         Map<String, Object> authError = requireTeacher(session);
@@ -38,6 +40,7 @@ public class QuestionManageController {
         return response;
     }
 
+    /** 查询全部题目列表 */
     @GetMapping
     public Map<String, Object> listQuestions(HttpSession session) {
         Map<String, Object> authError = requireTeacher(session);
@@ -54,6 +57,7 @@ public class QuestionManageController {
         return response;
     }
 
+    /** 按 id 删除题目 */
     @DeleteMapping("/{id}")
     public Map<String, Object> deleteQuestion(@PathVariable("id") Long id, HttpSession session) {
         Map<String, Object> authError = requireTeacher(session);
@@ -70,6 +74,7 @@ public class QuestionManageController {
         return response;
     }
 
+    /** 校验教师权限 */
     private Map<String, Object> requireTeacher(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"teacher".equals(role)) {
@@ -82,6 +87,7 @@ public class QuestionManageController {
         return null;
     }
 
+    /** 构造错误响应 */
     private Map<String, Object> error(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
@@ -89,6 +95,7 @@ public class QuestionManageController {
         return response;
     }
 
+    /** 题目实体转前端安全 Map */
     private Map<String, Object> sanitizeQuestion(QuestionBank question) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", question.getId());

@@ -10,12 +10,14 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生首页聚合数据 */
 @RequestMapping("/xwd/student/home")
 public class StudentHomeController {
 
     @Autowired
     private StudentHomeService studentHomeService;
 
+    /** 学生首页概览（统计 + 轻量推荐） */
     @GetMapping("/overview")
     public Map<String, Object> overview(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -28,6 +30,7 @@ public class StudentHomeController {
         return response;
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {

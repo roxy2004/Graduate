@@ -36,6 +36,26 @@
       </div>
     </div>
 
+    <section class="quick-panel trends-panel">
+      <div class="quick-title">学习趋势</div>
+      <p v-if="trendHint" class="trends-hint">{{ trendHint }}</p>
+      <div v-if="trendLoading" class="placeholder muted">趋势数据加载中…</div>
+      <div v-else-if="!hasTrendData" class="placeholder muted">
+        暂无作答记录，在练习中心完成答题后将显示正确率与知识点曲线。
+      </div>
+      <template v-else>
+        <div class="chart-block">
+          <div class="chart-caption">整体正确率（按有作答的自然日）</div>
+          <div ref="overallChartRef" class="echart-box" />
+        </div>
+        <div v-if="hasKpTrendChart" class="chart-block">
+          <div class="chart-caption">高频知识点累计正确率（练习次数 Top 6）</div>
+          <div ref="kpChartRef" class="echart-box" />
+        </div>
+        <p v-else class="placeholder muted">知识点折线图：暂无带知识点关联的作答记录。</p>
+      </template>
+    </section>
+
     <section class="quick-panel">
       <div class="quick-title">修改密码</div>
       <div class="password-form">
@@ -60,7 +80,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import * as echarts from "echarts";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage } from "element-plus";
 import request from "@/utils/request";
@@ -80,6 +101,148 @@ const passwordForm = reactive({
   newPassword: "",
   confirmPassword: "",
 });
+
+const trendLoading = ref(false);
+const trendHint = ref("");
+const overallSeries = ref([]);
+const kpTrends = ref([]);
+const overallChartRef = ref(null);
+const kpChartRef = ref(null);
+let overallChart = null;
+let kpChart = null;
+
+const hasTrendData = computed(() => overallSeries.value.length > 0);
+const hasKpTrendChart = computed(() =>
+  kpTrends.value.some((k) => Array.isArray(k.series) && k.series.length > 0),
+);
+
+const disposeTrendCharts = () => {
+  overallChart?.dispose();
+  kpChart?.dispose();
+  overallChart = null;
+  kpChart = null;
+};
+
+const onTrendResize = () => {
+  overallChart?.resize();
+  kpChart?.resize();
+};
+
+const buildOverallChartOption = () => {
+  const dates = overallSeries.value.map((r) => r.date);
+  const cumulative = overallSeries.value.map((r) => r.cumulativeAccuracy);
+  const daily = overallSeries.value.map((r) => r.dailyAccuracy);
+  return {
+    color: ["#2563eb", "#94a3b8"],
+    tooltip: { trigger: "axis" },
+    legend: { data: ["累计正确率", "当日正确率"], top: 4 },
+    grid: { left: 52, right: 20, top: 40, bottom: 28 },
+    xAxis: { type: "category", boundaryGap: false, data: dates },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: 100,
+      axisLabel: { formatter: "{value}%" },
+      splitLine: { lineStyle: { type: "dashed", color: "#e2e8f0" } },
+    },
+    series: [
+      {
+        name: "累计正确率",
+        type: "line",
+        smooth: true,
+        showSymbol: dates.length <= 24,
+        lineStyle: { width: 3 },
+        data: cumulative,
+      },
+      {
+        name: "当日正确率",
+        type: "line",
+        smooth: true,
+        showSymbol: dates.length <= 24,
+        lineStyle: { width: 2, type: "dashed" },
+        data: daily,
+      },
+    ],
+  };
+};
+
+const buildKpChartOption = () => {
+  const active = kpTrends.value.filter((k) => k.series?.length);
+  const dateSet = new Set();
+  active.forEach((k) => {
+    k.series.forEach((p) => {
+      if (p.date) dateSet.add(p.date);
+    });
+  });
+  const dates = [...dateSet].sort();
+  const palette = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0d9488", "#ca8a04"];
+  const series = active.map((k, idx) => {
+    const map = new Map(k.series.map((p) => [p.date, p.cumulativeAccuracy]));
+    return {
+      name: k.kpName || `知识点 #${k.kpId}`,
+      type: "line",
+      smooth: true,
+      connectNulls: true,
+      showSymbol: dates.length <= 18,
+      lineStyle: { width: 2 },
+      itemStyle: { color: palette[idx % palette.length] },
+      data: dates.map((d) => (map.has(d) ? map.get(d) : null)),
+    };
+  });
+  return {
+    tooltip: { trigger: "axis" },
+    legend: { type: "scroll", bottom: 0, data: series.map((s) => s.name) },
+    grid: { left: 52, right: 20, top: 28, bottom: Math.min(120, 36 + active.length * 18) },
+    xAxis: { type: "category", boundaryGap: false, data: dates },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: 100,
+      axisLabel: { formatter: "{value}%" },
+      splitLine: { lineStyle: { type: "dashed", color: "#e2e8f0" } },
+    },
+    series,
+  };
+};
+
+const renderTrendCharts = async () => {
+  window.removeEventListener("resize", onTrendResize);
+  disposeTrendCharts();
+  await nextTick();
+  if (!hasTrendData.value || !overallChartRef.value) return;
+  overallChart = echarts.init(overallChartRef.value);
+  overallChart.setOption(buildOverallChartOption());
+  if (hasKpTrendChart.value && kpChartRef.value) {
+    kpChart = echarts.init(kpChartRef.value);
+    kpChart.setOption(buildKpChartOption());
+  }
+  window.addEventListener("resize", onTrendResize);
+};
+
+const loadLearningTrends = async () => {
+  trendLoading.value = true;
+  try {
+    const resp = await request.get("/xwd/student/account/learning-trends");
+    if (resp?.status === "success") {
+      const d = resp.data || {};
+      trendHint.value = typeof d.hint === "string" ? d.hint : "";
+      overallSeries.value = Array.isArray(d.overallAccuracy) ? d.overallAccuracy : [];
+      kpTrends.value = Array.isArray(d.knowledgePointTrends) ? d.knowledgePointTrends : [];
+    } else {
+      trendHint.value = "";
+      overallSeries.value = [];
+      kpTrends.value = [];
+    }
+  } catch {
+    trendHint.value = "";
+    overallSeries.value = [];
+    kpTrends.value = [];
+  } finally {
+    trendLoading.value = false;
+  }
+  await nextTick();
+  await renderTrendCharts();
+};
 
 const avatarText = computed(() => {
   const name = (profile.username || "ST").toString().trim();
@@ -188,6 +351,12 @@ const changePassword = async () => {
 
 onMounted(() => {
   loadProfile();
+  loadLearningTrends();
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", onTrendResize);
+  disposeTrendCharts();
 });
 </script>
 
@@ -328,6 +497,38 @@ onMounted(() => {
 
 .kv .ok {
   color: #0f766e;
+}
+
+.trends-panel .trends-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.placeholder.muted {
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.chart-block {
+  margin-bottom: 18px;
+}
+
+.chart-block:last-child {
+  margin-bottom: 0;
+}
+
+.chart-caption {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.echart-box {
+  width: 100%;
+  height: 280px;
 }
 
 .quick-panel {

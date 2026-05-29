@@ -13,12 +13,14 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生仪表盘与学习画像 */
 @RequestMapping("/xwd/student")
 public class StudentDashboardController {
 
     @Autowired
     private StudentDashboardService studentDashboardService;
 
+    /** 学生仪表盘统计数据 */
     @GetMapping("/dashboard")
     public Map<String, Object> getDashboardStats(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -34,6 +36,7 @@ public class StudentDashboardController {
         return response;
     }
 
+    /** 学生学习画像数据 */
     @GetMapping("/profile")
     public Map<String, Object> getLearnerProfile(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -49,6 +52,7 @@ public class StudentDashboardController {
         return response;
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {

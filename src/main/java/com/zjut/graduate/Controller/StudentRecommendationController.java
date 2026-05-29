@@ -10,12 +10,14 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生学习路线推荐 */
 @RequestMapping("/xwd/student/recommendations")
 public class StudentRecommendationController {
 
     @Autowired
     private LearningRouteService learningRouteService;
 
+    /** 获取最新学习路线推荐（可选 AI） */
     @GetMapping("/latest")
     public Map<String, Object> latest(@RequestParam(value = "includeAi", defaultValue = "true") boolean includeAi,
                                       HttpSession session) {
@@ -29,6 +31,7 @@ public class StudentRecommendationController {
         return response;
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {

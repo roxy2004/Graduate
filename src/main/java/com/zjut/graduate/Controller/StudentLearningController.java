@@ -15,12 +15,14 @@ import java.util.Map;
 
 @RestController
 @CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
+/** 学生专项学习（课程、会话、笔记） */
 @RequestMapping("/xwd/student/learning")
 public class StudentLearningController {
 
     @Autowired
     private LearningContentService learningContentService;
 
+    /** 查询可选课程列表 */
     @GetMapping("/courses")
     public Map<String, Object> listCourses(HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -32,6 +34,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 查询课程学习大纲（含进度） */
     @GetMapping("/courses/{courseId}/outline")
     public Map<String, Object> getCourseOutline(@PathVariable("courseId") Long courseId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -44,6 +47,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 查询章节级学习资源 */
     @GetMapping("/courses/{courseId}/chapters/{chapterId}/resources")
     public Map<String, Object> listChapterResources(@PathVariable("courseId") Long courseId,
                                                     @PathVariable("chapterId") Long chapterId,
@@ -57,6 +61,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 查询课程下小节列表 */
     @GetMapping("/courses/{courseId}/sections")
     public Map<String, Object> listSections(@PathVariable("courseId") Long courseId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -69,6 +74,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 查询小节学习资源 */
     @GetMapping("/sections/{sectionId}/resources")
     public Map<String, Object> listResources(@PathVariable("sectionId") Long sectionId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -80,6 +86,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 开始小节学习会话 */
     @PostMapping("/sections/{sectionId}/start")
     public Map<String, Object> startLearning(@PathVariable("sectionId") Long sectionId, HttpSession session,
                                              @RequestBody(required = false) Map<String, String> payload) {
@@ -95,6 +102,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 学习会话心跳，累加学习时长 */
     @PostMapping("/sessions/{sessionId}/heartbeat")
     public Map<String, Object> heartbeat(@PathVariable("sessionId") Long sessionId,
                                          @RequestBody Map<String, Object> payload,
@@ -109,6 +117,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 结束学习会话 */
     @PostMapping("/sessions/{sessionId}/end")
     public Map<String, Object> endSession(@PathVariable("sessionId") Long sessionId,
                                           @RequestBody(required = false) Map<String, Object> payload,
@@ -123,6 +132,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 在小节下新增学习笔记 */
     @PostMapping("/sections/{sectionId}/notes")
     public Map<String, Object> addNote(@PathVariable("sectionId") Long sectionId,
                                        @RequestBody Map<String, Object> payload,
@@ -141,6 +151,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 按章节查询学习笔记 */
     @GetMapping("/courses/{courseId}/chapters/{chapterId}/notes")
     public Map<String, Object> listChapterNotes(@PathVariable("courseId") Long courseId,
                                                 @PathVariable("chapterId") Long chapterId,
@@ -157,6 +168,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 按小节查询学习笔记 */
     @GetMapping("/sections/{sectionId}/notes")
     public Map<String, Object> listNotes(@PathVariable("sectionId") Long sectionId,
                                          @RequestParam(value = "limit", required = false) Integer limit,
@@ -172,6 +184,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 更新学习笔记 */
     @PutMapping("/notes/{noteId}")
     public Map<String, Object> updateNote(@PathVariable("noteId") Long noteId,
                                           @RequestBody Map<String, Object> payload,
@@ -193,6 +206,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 删除学习笔记 */
     @DeleteMapping("/notes/{noteId}")
     public Map<String, Object> deleteNote(@PathVariable("noteId") Long noteId, HttpSession session) {
         Map<String, Object> authError = requireStudent(session);
@@ -207,6 +221,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 笔记增删改失败响应 */
     private Map<String, Object> noteMutationError(String message) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "error");
@@ -214,6 +229,7 @@ public class StudentLearningController {
         return response;
     }
 
+    /** 校验学生权限 */
     private Map<String, Object> requireStudent(HttpSession session) {
         String role = (String) session.getAttribute("role");
         if (!"student".equals(role)) {
@@ -226,6 +242,7 @@ public class StudentLearningController {
         return null;
     }
 
+    /** 解析非负整数参数 */
     private int parsePositiveInt(Object raw) {
         if (raw == null) {
             return 0;
